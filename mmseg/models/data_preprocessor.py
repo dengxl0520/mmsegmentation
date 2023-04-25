@@ -149,3 +149,59 @@ class SegDataPreProcessor(BaseDataPreprocessor):
                 inputs = torch.stack(inputs, dim=0)
 
         return dict(inputs=inputs, data_samples=data_samples)
+
+@MODELS.register_module()
+class SegVideoPreProcessor(BaseDataPreprocessor):
+
+    def __init__(
+        self,
+        mean: Sequence[Number] = None,
+        std: Sequence[Number] = None,
+        size: Optional[tuple] = None,
+        size_divisor: Optional[int] = None,
+        pad_val: Number = 0,
+        seg_pad_val: Number = 255,
+        bgr_to_rgb: bool = False,
+        rgb_to_bgr: bool = False,
+        batch_augments: Optional[List[dict]] = None,
+        test_cfg: dict = None,
+    ):
+        super().__init__()
+
+        assert not (bgr_to_rgb and rgb_to_bgr), (
+            '`bgr2rgb` and `rgb2bgr` cannot be set to True at the same time')
+        self.channel_conversion = rgb_to_bgr or bgr_to_rgb
+
+        if mean is not None:
+            assert std is not None, 'To enable the normalization in ' \
+                                    'preprocessing, please specify both ' \
+                                    '`mean` and `std`.'
+            # Enable the normalization in preprocessing.
+            self._enable_normalize = True
+            self.register_buffer('mean',
+                                 torch.tensor(mean).view(-1, 1, 1), False)
+            self.register_buffer('std',
+                                 torch.tensor(std).view(-1, 1, 1), False)
+        else:
+            self._enable_normalize = False
+
+
+    def forward(self, data: dict, training: bool = False) -> Dict[str, Any]:
+        data = self.cast_data(data)  # type: ignore
+        inputs = data['inputs']
+        
+        # rgb channel conversion
+        if self.channel_conversion and inputs[0].size(0) == 3:
+            inputs = [_input[[2, 1, 0], ...] for _input in inputs]
+
+        # to float
+        inputs = [_input.float() for _input in inputs]
+        # normalize
+        if self._enable_normalize:
+            inputs = [(_input - self.mean) / self.std for _input in inputs]
+
+        inputs = torch.stack(inputs, dim=0)
+        data_samples = data.get('data_samples', None)
+
+        return dict(inputs=inputs, data_samples=data_samples)
+
