@@ -63,6 +63,80 @@ def load_video_and_mask_file(img_path: str, anno_path: str, frame_length: int = 
 
     return imgs, masks, ef
 
+@TRANSFORMS.register_module()
+class LoadNpyFile(BaseTransform):
+    def __init__(self, frame_length = 10, label_idxs = ['0','9']) -> None:
+        self.frame_length = frame_length
+        self.label_idxs = label_idxs
+
+    def transform(self, results: Dict) -> Optional[Dict]:
+        img_path = results['img_path']
+        anno_path = results['seg_map_path']
+        imgs, masks, ef = load_video_and_mask_file(img_path, anno_path, self.frame_length)
+
+        results['img'] = imgs
+        results['ori_imgs'] = imgs
+        results['masks'] = masks
+        results['frame_length'] = self.frame_length
+        results['label_idxs'] = self.label_idxs
+        results['ef'] = ef
+        results['imgs_shape'] = imgs.shape
+        results['img_shape'] = imgs.shape[2:]
+        results['ori_shape'] = imgs.shape[2:]
+
+        return results
+    
+
+@TRANSFORMS.register_module()
+class PackSegMultiInputs(BaseTransform):
+    def __init__(self,
+                 meta_keys=('img_path', 'seg_map_path', 'ori_shape',
+                            'img_shape', 'pad_shape', 'scale_factor', 'flip',
+                            'flip_direction', 'reduce_zero_label','frame_length',
+                            'label_idxs')):
+        self.meta_keys = meta_keys
+
+    def transform(self, results: dict) -> dict:
+        packed_results = dict()
+
+        if 'img' in results:
+            imgs = [to_tensor(img) for img in results['img']]
+            packed_results['inputs'] = imgs
+
+        data_samples = []
+        if 'masks' in results:
+            for mask in results['masks']:
+                data_sample = SegEchoDataSample()
+                mask = to_tensor(mask.astype(np.int64))
+                mask.unsqueeze_(0)
+                gt_sem_seg_data = dict(data=mask)
+                data_sample.gt_sem_seg = PixelData(**gt_sem_seg_data)
+                data_samples.append(data_sample)
+
+        if 'masks_edge' in results:
+            for i in range(len(results['masks_edge'])):
+                mask_edge = results['masks_edge'][i]
+                mask_edge = to_tensor(mask_edge.astype(np.int64))
+                mask_edge.unsqueeze_(0)
+                gt_edge_data = dict(data=mask_edge)
+                data_samples[i].set_data(dict(gt_edge_map=PixelData(**gt_edge_data)))
+            
+                
+        img_meta = {}
+        for key in self.meta_keys:
+            if key in results:
+                img_meta[key] = results[key]
+        
+        img_meta['ef'] = to_tensor(results['ef'].astype(np.float32))
+        
+        for i in range(len(img_meta['label_idxs'])):
+            data_sample = data_samples[i]
+            img_meta['frame_idx'] = img_meta['label_idxs'][i]
+            data_sample.set_metainfo(img_meta)
+    
+        packed_results['data_samples'] = data_samples
+        return packed_results
+
 
 @TRANSFORMS.register_module()
 class LoadVideoAndAnnoFromFile(BaseTransform):
@@ -93,11 +167,11 @@ class LoadVideoAndAnnoFromFile(BaseTransform):
 class VideoGenerateEdge(GenerateEdge):
     def transform(self, results: Dict) -> Dict:
         mask_edge = []
-        for i in range(len(results["masks"])):
-            results['gt_seg_map'] = results['masks'][i]
+        for mask in results['masks']:
+            results['gt_seg_map'] = mask
             super().transform(results)
             mask_edge.append(results['gt_edge_map'])
-        results['mask_edge'] = mask_edge
+        results['masks_edge'] = mask_edge
         return results
 
 
@@ -165,10 +239,10 @@ class PackSegVideoInputs(BaseTransform):
             ori_frame2 = results['ori_imgs'][-1,:,:,:]
             gt_sem_seg_data = dict(frame1=frame1, frame2=frame2, ori_frame1=ori_frame1, ori_frame2=ori_frame2)
             data_sample.gt_sem_seg = PixelData(**gt_sem_seg_data)
-        if 'mask_edge' in results:
-            frame1_edge = to_tensor(results['mask_edge'][0].astype(np.int64))
+        if 'masks_edge' in results:
+            frame1_edge = to_tensor(results['masks_edge'][0].astype(np.int64))
             frame1_edge.unsqueeze_(0)
-            frame2_edge = to_tensor(results['mask_edge'][1].astype(np.int64))
+            frame2_edge = to_tensor(results['masks_edge'][1].astype(np.int64))
             frame2_edge.unsqueeze_(0)
             gt_edge_data = dict(frame1_edge=frame1_edge,
                 frame2_edge=frame2_edge)

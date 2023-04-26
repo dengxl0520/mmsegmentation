@@ -64,12 +64,14 @@ class VideoEncoderDecoder(EncoderDecoder):
                     if i == 0:
                         for data_sample in data_samples_new:
                             data_sample.gt_sem_seg.data = data_sample.gt_sem_seg.frame1
-                            data_sample.gt_edge_map.data = data_sample.gt_edge_map.frame1_edge
+                            if 'gt_edge_map' in data_sample:
+                                data_sample.gt_edge_map.data = data_sample.gt_edge_map.frame1_edge
                             data_sample.set_metainfo(dict(frameidx='1'))
                     else:
                         for data_sample in data_samples_new:
                             data_sample.gt_sem_seg.data = data_sample.gt_sem_seg.frame2
-                            data_sample.gt_edge_map.data = data_sample.gt_edge_map.frame2_edge
+                            if 'gt_edge_map' in data_sample:
+                                data_sample.gt_edge_map.data = data_sample.gt_edge_map.frame2_edge
                             data_sample.set_metainfo(dict(frameidx='2'))
 
                     if mode == 'loss':
