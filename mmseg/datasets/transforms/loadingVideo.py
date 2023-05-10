@@ -65,7 +65,7 @@ def load_video_and_mask_file(img_path: str, anno_path: str, frame_length: int = 
 
 @TRANSFORMS.register_module()
 class LoadNpyFile(BaseTransform):
-    def __init__(self, frame_length = 10, label_idxs = ['0','9']) -> None:
+    def __init__(self, frame_length = 10, label_idxs = [0,9]) -> None:
         self.frame_length = frame_length
         self.label_idxs = label_idxs
 
@@ -127,13 +127,17 @@ class PackSegMultiInputs(BaseTransform):
             if key in results:
                 img_meta[key] = results[key]
         
-        img_meta['ef'] = to_tensor(results['ef'].astype(np.float32))
+        if 'ef' in results:
+            img_meta['ef'] = to_tensor(results['ef'].astype(np.float32))
         
-        for i in range(len(img_meta['label_idxs'])):
-            data_sample = data_samples[i]
-            img_meta['frame_idx'] = img_meta['label_idxs'][i]
-            data_sample.set_metainfo(img_meta)
-    
+        if 'label_idxs' in img_meta:
+            for i in range(len(img_meta['label_idxs'])):
+                data_sample = data_samples[i]
+                img_meta['frame_idx'] = img_meta['label_idxs'][i]
+                data_sample.set_metainfo(img_meta)
+                ori_img_data = dict(data=results['img'][i,...])
+                data_sample.set_data(dict(ori_img=PixelData(**ori_img_data)))
+
         packed_results['data_samples'] = data_samples
         return packed_results
 

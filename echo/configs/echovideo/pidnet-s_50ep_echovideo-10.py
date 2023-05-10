@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/default_runtime.py',
-    '../_base_/datasets/echovideo.py', 
+    '../_base_/datasets/echovideo-10.py', 
     '../_base_/schedules/schedule_50ep.py',
     '../_base_/models/pidnet-s.py'
 ]
@@ -15,16 +15,19 @@ data_preprocessor = dict(
     size=(112, 112))
 
 model = dict(
+    type='VideoEncoderDecoder',
+    input_type='video',
+    supervised='semisup',
     data_preprocessor=data_preprocessor,
 )
 train_dataloader = dict(
-    batch_size = 128,
+    batch_size = 64,
 )
 
 # boost
 # optim_wrapper=dict(type='AmpOptimWrapper')
 cfg=dict(compile=True)
 # vis
-default_hooks = dict(
-    visualization=dict(type='SegVisualizationHook', draw=True, interval=1)
-)
+# default_hooks = dict(
+#     visualization=dict(type='SegNpyVisualizationHook', draw=True, interval=1)
+# )

@@ -11,11 +11,11 @@ data_preprocessor = dict(
     size=(112,112))
 model = dict(
     type='VideoEncoderDecoder',
-    input_type='img',
-    supervised='sup',
+    input_type='video',
+    supervised='semisup',
     data_preprocessor=data_preprocessor,
     backbone=dict(
-        type='PIDNet',
+        type='PIDNetV2',
         in_channels=3,
         channels=32,
         ppm_channels=96,
@@ -25,8 +25,12 @@ model = dict(
         norm_cfg=norm_cfg,
         act_cfg=dict(type='ReLU', inplace=True),
         init_cfg=dict(type='Pretrained', checkpoint=checkpoint_file)),
+    neck=dict(
+        type='MultiGPM',
+        d_model=64,
+    ),
     decode_head=dict(
-        type='PIDHead',
+        type='PIDHeadV2',
         in_channels=128,
         channels=128,
         num_classes=2,

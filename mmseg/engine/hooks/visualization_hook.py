@@ -147,16 +147,9 @@ class SegNpyVisualizationHook(Hook):
         if self.every_n_inner_iters(batch_idx, self.interval):
             for output in outputs:
                 img_path = output.img_path
-                frameidx = output.metainfo['frameidx']
-                if frameidx == '1':
-                    img = output.gt_sem_seg.ori_frame1
-                    output.gt_sem_seg.data = output.gt_sem_seg.frame1
-                elif frameidx == '2':
-                    img = output.gt_sem_seg.ori_frame2                    
-                    output.gt_sem_seg.data = output.gt_sem_seg.frame2
-                else:
-                    raise RuntimeError
+                img = output.ori_img.data
                 img = img.transpose(1,2,0)
+                frameidx = str(output.frame_idx)
                 window_name = f'{mode}_' + osp.basename(img_path).split('.')[0] + '_frame' + frameidx
 
                 self._visualizer.add_datasample(

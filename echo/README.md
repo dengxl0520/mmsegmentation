@@ -4,23 +4,32 @@
 
 *一般*
 - [ ] 添加CAMUS数据集
-- [ ] 添加辅助head的forward（不一定要）
 - [ ] 添加norm、数据增强等数据转换过程
+- [ ] 清晰的可视化图
 
 *重要*
 
 *紧急*
-- [ ] 写各种head的配置，构建baseline(pidnet)
-- [ ] AOT、DeAOT
-- [ ] 清晰的可视化图
-- [ ] 
-
+- [ ] 写AOT、DeAOT的head
+- [ ] 完成半监督的forward,即重写encoder_decoder.py
+- [ ] 测试是否能可视化结果
+s
 
 ## NEXT 
-结合LSTT与PIDNet，分层传播context、detail和boundary到当前帧
-
+- PSPNet与PIDNet在echovideo做全监督对比
+  - 对比分割性能、训练时间、参数量、占用显存
+- 全监督与半监督对比
+  - sup&semisup，performance是否有提升
+- 在哪里可以改进？
+  - long-term
+  - 时间帧的pos emb
+- 不用memories
 ## 下一个运行
-CUDA_VISIBLE_DEVICES=2 python tools/train.py echo/configs/others/pidnet-s_1xb1_100epoch_112x112_echocycle.py
+CUDA_VISIBLE_DEVICES=3 python tools/train.py echo/configs/echovideo/pidnet-s_gpm_50ep_echovideo-10.py
+
+CUDA_VISIBLE_DEVICES=3 python tools/test.py work_dirs/pidnet-s_multigpm_200ep_echovideo-10/pidnet-s_multigpm_200ep_echovideo-10.py work_dirs/pidnet-s_multigpm_200ep_echovideo-10/epoch_200.pth
+
+python tools/test.py work_dirs/pidnet-s_gpm_50ep_echovideo-2/pidnet-s_gpm_50ep_echovideo-2.py work_dirs/pidnet-s_gpm_50ep_echovideo-2/epoch_50.pth
 
 ## preprocess echonet
 ```
@@ -28,9 +37,9 @@ python echo/tools/preprocess_echonet.py -i /data/dengxiaolong/EchoNet-Dynamic/ -
 ```
 
 ## train
-CUDA_VISIBLE_DEVICES=1 python tools/train.py echo/configs/echonet/pidnet-l_200ep_112x112_echonet.py
+CUDA_VISIBLE_DEVICES=2;python tools/train.py echo/configs/echovideo/pidnet-s_multigpm_200ep_echovideo-10.py
 
-CUDA_VISIBLE_DEVICES=1,2 python tools/train.py echo/pspnet_r50-d8_112x112_20k_echonet.py 2
+CUDA_VISIBLE_DEVICES=2,3 bash tools/dist_train.sh echo/configs/echovideo/pidnet-s_multigpm_50ep_echovideo-10.py 2
 
 ## test
 CUDA_VISIBLE_DEVICES=0 python tools/test.py \

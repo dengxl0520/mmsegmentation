@@ -5,10 +5,9 @@ from mmseg.registry import MODELS
 
 
 @MODELS.register_module()
-class DeAOT(nn.Module):
+class AOT(nn.Module):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
     def forward(self, inputs):
         pass
-

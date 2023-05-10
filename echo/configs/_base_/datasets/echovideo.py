@@ -4,14 +4,14 @@ data_root = 'data/echonet/echocycle'
 
 # pipeline
 pipeline = [
-    dict(type='LoadNpyFile', frame_length=2, label_idxs=['0','1']),
+    dict(type='LoadNpyFile', frame_length=2, label_idxs=[0,1]),
     dict(type='VideoGenerateEdge', edge_width=4),
     dict(type='PackSegMultiInputs')
 ]
 
 # dataloader
 train_dataloader = dict(
-    batch_size=128,
+    batch_size=32,
     num_workers=8,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
