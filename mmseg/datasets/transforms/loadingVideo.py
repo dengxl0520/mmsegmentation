@@ -218,7 +218,6 @@ class VideoPhotoMetricDistortion(PhotoMetricDistortion):
 
 @TRANSFORMS.register_module()
 class PackSegVideoInputs(BaseTransform):
-
     def __init__(self,
                  meta_keys=('img_path', 'seg_map_path', 'ori_shape',
                             'img_shape', 'pad_shape', 'scale_factor', 'flip',

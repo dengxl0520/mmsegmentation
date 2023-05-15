@@ -14,7 +14,6 @@ from mmseg.utils import (ConfigType, OptConfigType, OptMultiConfig,
 
 @MODELS.register_module()
 class VideoEncoderDecoder(EncoderDecoder):
-
     def __init__(self,
                  backbone: ConfigType,
                  decode_head: ConfigType,
@@ -34,7 +33,6 @@ class VideoEncoderDecoder(EncoderDecoder):
         assert supervised == 'sup' or supervised == 'semisup'
         self.input_type = input_type
         self.supervised = supervised
-
 
     def forward(self, inputs: Tensor, data_samples, mode: str = 'tensor'):
         assert data_samples is not None
@@ -113,15 +111,7 @@ class VideoEncoderDecoder(EncoderDecoder):
             outputs = torch.stack(outputs)
             x = (temp_p, outputs, temp_d) if self.training else outputs
 
-        # only use frames with anno
-        if self.frame_length == len(self.label_idxs) :
-            sup_featrue = x
-        elif isinstance(x, tuple) or isinstance(x, list):
-            if len(self.sup_feature_idxs) != len(x[0]): 
-                sup_featrue = [f[self.sup_feature_idxs, ...] for f in x]
-        elif len(self.sup_feature_idxs) != len(x):
-            sup_featrue = x[self.sup_feature_idxs, ...]            
-        return sup_featrue 
+        return x 
             
     def semi_extract_feat(self, inputs: Tensor) -> List[Tensor]:
         """Extract features from images."""
@@ -129,7 +119,17 @@ class VideoEncoderDecoder(EncoderDecoder):
         x = self.backbone(inputs)
         if self.with_neck:
             x = self.semi_neck_forward(x)
-        return x
+
+        # only use frames with anno
+        if self.frame_length == len(self.label_idxs) :
+            sup_featrue = x
+        elif isinstance(x, tuple) or isinstance(x, list):
+            if len(self.sup_feature_idxs) != len(x[0]): 
+                sup_featrue = [f[self.sup_feature_idxs, ...] for f in x]
+        elif len(self.sup_feature_idxs) != len(x):
+            sup_featrue = x[self.sup_feature_idxs, ...]
+
+        return sup_featrue
 
     def semi_loss(self, inputs: Tensor, data_samples: SampleList) -> dict:
         """Calculate losses from a batch of inputs and data samples.
@@ -147,14 +147,10 @@ class VideoEncoderDecoder(EncoderDecoder):
         x = self.semi_extract_feat(inputs)
 
         losses = dict()
+        loss_decode = self.decode_head.loss(x, data_samples,
+                                            self.train_cfg)
 
-        loss_decode = self._decode_head_forward_train(x, data_samples)
-        losses.update(loss_decode)
-
-        if self.with_auxiliary_head:
-            loss_aux = self._auxiliary_head_forward_train(x, data_samples)
-            losses.update(loss_aux)
-
+        losses.update(add_prefix(loss_decode, 'decode'))
         return losses
 
     def semi_predict(self,
@@ -212,3 +208,30 @@ class VideoEncoderDecoder(EncoderDecoder):
         """
         x = self.semi_extract_feat(inputs)
         return self.decode_head.forward(x)
+
+    def generate_pseudo_label(self,inputs,data_samples):
+        """Use backbone and head generate pseudo label .
+        
+        """
+        # generate  
+        if data_samples is not None:
+            batch_img_metas = [
+                data_sample.metainfo for data_sample in data_samples
+            ]
+        else:
+            batch_img_metas = [
+                dict(
+                    ori_shape=inputs.shape[2:],
+                    img_shape=inputs.shape[2:],
+                    pad_shape=inputs.shape[2:],
+                    padding_size=[0, 0, 0, 0])
+            ] * inputs.shape[0]
+        x = self.backbone(inputs)
+        temp_p, out, temp_d = x
+        seg_logits = self.decode_head.predict(out, batch_img_metas,
+                                              self.test_cfg)
+        new_data_samples = []
+        # pack to new data samples
+
+        return new_data_samples
+

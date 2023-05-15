@@ -24,6 +24,13 @@ s
   - long-term
   - 时间帧的pos emb
 - 不用memories
+- 生成具有时间一致性的伪标记
+
+## NOW
+- 首先通过pidnet-s_2训练一个分割模型
+- 再在single-gpm或者multi-gpm进行半监督
+  1. 产生伪标签
+  2. 使用伪标签进行再训练
 ## 下一个运行
 CUDA_VISIBLE_DEVICES=3 python tools/train.py echo/configs/echovideo/pidnet-s_gpm_50ep_echovideo-10.py
 

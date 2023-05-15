@@ -31,3 +31,5 @@ cfg=dict(compile=True)
 default_hooks = dict(
     visualization=dict(type='SegNpyVisualizationHook', draw=True, interval=50)
 )
+
+load_from = 'echo/pretrain/pretrain_pidnet-s_50ep_91.75.pth'

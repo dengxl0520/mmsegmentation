@@ -171,12 +171,14 @@ class SegDataPreProcessorV2(SegDataPreProcessor):
         inputs_new = []
         data_samples_new = []
         if isinstance(inputs[0], tuple):
-            for i in inputs:
-                inputs_new.extend(i)
+            for i in range(len(inputs[0])):
+                for j in range(len(inputs)):
+                    inputs_new.append(inputs[j][i])
             inputs = inputs_new
         if isinstance(data_samples[0], tuple):
-            for i in data_samples:
-                data_samples_new.extend(i)
+            for i in range(len(data_samples[0])):
+                for j in range(len(data_samples)):
+                    data_samples_new.append(data_samples[j][i])
             data_samples = data_samples_new
 
         # TODO: whether normalize should be after stack_batch

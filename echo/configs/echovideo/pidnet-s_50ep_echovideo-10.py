@@ -21,7 +21,7 @@ model = dict(
     data_preprocessor=data_preprocessor,
 )
 train_dataloader = dict(
-    batch_size = 64,
+    batch_size = 16,
 )
 
 # boost

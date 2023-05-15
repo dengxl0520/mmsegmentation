@@ -614,7 +614,6 @@ class GPM(nn.Module):
             self.decoder_norms = nn.ModuleList(self.decoder_norms)
             
     def forward(self, tgt, size_2d=None):
-
         # dropout
         for i in range(len(tgt)):
             n,c,h,w = tgt[i].size()
