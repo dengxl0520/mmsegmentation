@@ -643,21 +643,10 @@ class GPM(nn.Module):
 
         self.update_memories(save_memories)
                 
-        # if self.decoder_norms is not None:
-        #     if self.final_norm:
-        #         outputs = self.decoder_norms[-1](outputs)
-
-        #     if self.return_intermediate:
-        #         intermediate.pop()
-        #         intermediate.append(outputs)
-
-        #         if self.intermediate_norm:
-        #             for idx in range(len(intermediate) - 1):
-        #                 intermediate[idx] = self.decoder_norms[idx](
-        #                     intermediate[idx])
-
-        if self.return_intermediate:
-            return intermediate, intermediate_memories
+        if self.decoder_norms is not None:
+            if self.final_norm:
+                for output in outputs:
+                    output = self.decoder_norms[-1](output)
         
         h,w = size_2d
         for i in range(len(outputs)):
@@ -667,8 +656,8 @@ class GPM(nn.Module):
         return outputs
 
     def clear_memories(self):
-        self.long_term_memories = [None,None,None]
-        self.short_term_memories = [None,None,None]
+        self.long_term_memories = [None for i in range(len(self.layers))]
+        self.short_term_memories = [None for i in range(len(self.layers))]
 
     def update_memories(self,memories):
         # long_term_memories

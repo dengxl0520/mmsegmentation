@@ -1,7 +1,7 @@
 _base_ = [
     '../_base_/default_runtime.py',
-    '../_base_/datasets/echovideo-2.py', 
-    '../_base_/schedules/schedule_50ep.py',
+    '../_base_/datasets/echovideo-10.py', 
+    '../_base_/schedules/schedule_100ep_cosinelr.py',
     '../_base_/models/pidnet-s_gpm.py'
 ]
 
@@ -27,9 +27,5 @@ train_dataloader = dict(
 # boost
 # optim_wrapper=dict(type='AmpOptimWrapper')
 cfg=dict(compile=True)
-# vis
-default_hooks = dict(
-    visualization=dict(type='SegNpyVisualizationHook', draw=True, interval=50)
-)
 
 load_from = 'echo/pretrain/pretrain_pidnet-s_50ep_91.75.pth'

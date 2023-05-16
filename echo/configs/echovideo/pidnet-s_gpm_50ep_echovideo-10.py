@@ -21,15 +21,11 @@ model = dict(
     data_preprocessor=data_preprocessor,
 )
 train_dataloader = dict(
-    batch_size = 16,
+    batch_size = 64,
 )
 
 # boost
 # optim_wrapper=dict(type='AmpOptimWrapper')
 cfg=dict(compile=True)
-# vis
-default_hooks = dict(
-    visualization=dict(type='SegNpyVisualizationHook', draw=True, interval=50)
-)
 
 load_from = 'echo/pretrain/pretrain_pidnet-s_50ep_91.75.pth'

@@ -21,13 +21,9 @@ model = dict(
     data_preprocessor=data_preprocessor,
 )
 train_dataloader = dict(
-    batch_size = 32,
+    batch_size = 64,
 )
 
 # boost
 # optim_wrapper=dict(type='AmpOptimWrapper')
 cfg=dict(compile=True)
-# vis
-default_hooks = dict(
-    visualization=dict(type='SegNpyVisualizationHook', draw=True, interval=50)
-)
