@@ -1,7 +1,7 @@
 _base_ = [
     '../_base_/default_runtime.py',
     '../_base_/datasets/echovideo-2.py', 
-    '../_base_/schedules/schedule_50ep.py',
+    '../_base_/schedules/schedule_40k_cosinelr.py',
     '../_base_/models/pidnet-s.py'
 ]
 
@@ -20,14 +20,10 @@ model = dict(
     supervised='sup',
     data_preprocessor=data_preprocessor,
 )
-train_dataloader = dict(
-    batch_size = 64,
-)
 
 # boost
 # optim_wrapper=dict(type='AmpOptimWrapper')
-cfg=dict(compile=True)
 # vis
-default_hooks = dict(
-    visualization=dict(type='SegNpyVisualizationHook', draw=True, interval=50)
-)
+# default_hooks = dict(
+#     visualization=dict(type='SegNpyVisualizationHook', draw=True, interval=50)
+# )

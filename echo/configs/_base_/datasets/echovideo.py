@@ -11,10 +11,10 @@ pipeline = [
 
 # dataloader
 train_dataloader = dict(
-    batch_size=32,
+    batch_size=64,
     num_workers=8,
     persistent_workers=True,
-    sampler=dict(type='DefaultSampler', shuffle=True),
+    sampler=dict(type='InfiniteSampler', shuffle=True),
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
@@ -25,7 +25,7 @@ val_dataloader = dict(
     batch_size=1,
     num_workers=4,
     persistent_workers=True,
-    sampler=dict(type='DefaultSampler', shuffle=False),
+    sampler=dict(type='InfiniteSampler', shuffle=False),
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
@@ -36,7 +36,7 @@ test_dataloader = dict(
     batch_size=1,
     num_workers=4,
     persistent_workers=True,
-    sampler=dict(type='DefaultSampler', shuffle=False),
+    sampler=dict(type='InfiniteSampler', shuffle=False),
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
@@ -44,5 +44,6 @@ test_dataloader = dict(
             img_path='videos/test', seg_map_path='annotations/test'),
         pipeline=pipeline))
 val_evaluator = dict(
-    type='IoUMetric', iou_metrics=['mIoU', 'mDice', 'mFscore'])
-test_evaluator = val_evaluator
+    type='IoUMetric', iou_metrics=['mIoU', 'mDice', 'mFscore'], prefix='val')
+test_evaluator = dict(
+    type='IoUMetric', iou_metrics=['mIoU', 'mDice', 'mFscore'], prefix='test')
