@@ -14,7 +14,7 @@ train_dataloader = dict(
     batch_size=64,
     num_workers=8,
     persistent_workers=True,
-    sampler=dict(type='InfiniteSampler', shuffle=True),
+    sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
@@ -22,7 +22,7 @@ train_dataloader = dict(
             img_path='videos/train', seg_map_path='annotations/train'),
         pipeline=pipeline))
 val_dataloader = dict(
-    batch_size=1,
+    batch_size=64,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='InfiniteSampler', shuffle=False),
@@ -36,7 +36,7 @@ test_dataloader = dict(
     batch_size=1,
     num_workers=4,
     persistent_workers=True,
-    sampler=dict(type='InfiniteSampler', shuffle=False),
+    sampler=dict(type='DefaultSampler', shuffle=False),
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
