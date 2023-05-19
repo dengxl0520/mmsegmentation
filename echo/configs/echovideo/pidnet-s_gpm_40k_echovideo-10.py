@@ -20,6 +20,3 @@ model = dict(
     supervised='semisup',
     data_preprocessor=data_preprocessor,
 )
-
-# boost
-# optim_wrapper=dict(type='AmpOptimWrapper')

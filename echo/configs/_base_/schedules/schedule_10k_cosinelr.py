@@ -1,6 +1,6 @@
 # optimizer
 optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0005)
-optim_wrapper = dict(type='OptimWrapper', optimizer=optimizer, clip_grad=None)
+optim_wrapper = dict(type='AmpOptimWrapper', optimizer=optimizer, clip_grad=None)
 # learning policy
 param_scheduler = [
     dict(type='LinearLR',
@@ -9,13 +9,13 @@ param_scheduler = [
          begin=0,
          end=2000),
     dict(type='CosineAnnealingLR',
-         T_max=58000,
+         T_max=8000,
          by_epoch=False,
          begin=2000,
-         end=60000,)
+         end=10000,)
 ]
 # training schedule for 20k
-train_cfg = dict(type='IterBasedTrainLoop', max_iters=60000, val_interval=2000)
+train_cfg = dict(type='IterBasedTrainLoop', max_iters=10000, val_interval=2000)
 val_cfg = dict(type='ValLoop')
 test_cfg = dict(type='TestLoop')
 default_hooks = dict(

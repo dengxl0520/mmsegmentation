@@ -20,10 +20,3 @@ model = dict(
     supervised='sup',
     data_preprocessor=data_preprocessor,
 )
-
-# boost
-# optim_wrapper=dict(type='AmpOptimWrapper')
-# vis
-# default_hooks = dict(
-#     visualization=dict(type='SegNpyVisualizationHook', draw=True, interval=50)
-# )

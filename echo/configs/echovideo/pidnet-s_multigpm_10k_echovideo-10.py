@@ -1,7 +1,7 @@
 _base_ = [
     '../_base_/default_runtime.py',
     '../_base_/datasets/echovideo-10.py', 
-    '../_base_/schedules/schedule_60k_cosinelr.py',
+    '../_base_/schedules/schedule_20k_cosinelr.py',
     '../_base_/models/pidnet-s_multigpm.py'
 ]
 
@@ -20,5 +20,3 @@ model = dict(
     supervised='semisup',
     data_preprocessor=data_preprocessor,
 )
-# boost
-# optim_wrapper=dict(type='AmpOptimWrapper')

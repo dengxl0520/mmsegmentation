@@ -45,7 +45,7 @@ class BoundaryLoss(nn.Module):
         pos_index = (target_t == 1)
         neg_index = (target_t == 0)
 
-        weight = torch.zeros_like(log_p)
+        weight = torch.zeros_like(log_p,dtype=torch.float32)
         pos_num = pos_index.sum()
         neg_num = neg_index.sum()
         sum_num = pos_num + neg_num
