@@ -44,6 +44,8 @@ class VideoEncoderDecoder(EncoderDecoder):
         for i in range(self.batchsize):
             self.sup_feature_idxs.extend(
                 [label_idx + self.frame_length * i for label_idx in self.label_idxs])
+            
+        self.decode_head.sup_feature_idxs = self.sup_feature_idxs
 
         if self.input_type == 'img' and self.supervised == 'sup':
             return super().forward(inputs, data_samples, mode)
@@ -60,21 +62,6 @@ class VideoEncoderDecoder(EncoderDecoder):
                 raise RuntimeError(
                     f'Invalid mode "{mode}". '
                     'Only supports loss, predict and tensor mode')
-
-    def cut_before_backbone(self, inputs: Tensor) -> List[Tensor]:
-        # cut inputs: only use frames with anno
-        self.frame_length = 2
-        if len(self.sup_feature_idxs) != len(inputs):
-            inputs = inputs[self.sup_feature_idxs, ...]
-        return inputs
-    
-    def cut_after_backbone(self, x: Tensor) -> List[Tensor]:
-        # cut inputs: only use features with anno
-        if isinstance(x,list) or isinstance(x,tuple):
-            x = [f[self.sup_feature_idxs, ...]for f in x]
-        else:
-            x = x[self.sup_feature_idxs, ...]
-        return x
     
     def semi_neck_forward(self, x: Tensor):
         if self.with_neck:
@@ -115,21 +102,20 @@ class VideoEncoderDecoder(EncoderDecoder):
             
     def semi_extract_feat(self, inputs: Tensor) -> List[Tensor]:
         """Extract features from images."""
-        # inputs = self.cut_before_backbone(inputs)
         x = self.backbone(inputs)
         if self.with_neck:
             x = self.semi_neck_forward(x)
 
         # only use frames with anno
-        if self.frame_length == len(self.label_idxs) :
-            sup_featrue = x
-        elif isinstance(x, tuple) or isinstance(x, list):
-            if len(self.sup_feature_idxs) != len(x[0]): 
-                sup_featrue = [f[self.sup_feature_idxs, ...] for f in x]
-        elif len(self.sup_feature_idxs) != len(x):
-            sup_featrue = x[self.sup_feature_idxs, ...]
+        # if self.frame_length == len(self.label_idxs) :
+        #     sup_featrue = x
+        # elif isinstance(x, tuple) or isinstance(x, list):
+        #     if len(self.sup_feature_idxs) != len(x[0]): 
+        #         sup_featrue = [f[self.sup_feature_idxs, ...] for f in x]
+        # elif len(self.sup_feature_idxs) != len(x):
+        #     sup_featrue = x[self.sup_feature_idxs, ...]
 
-        return sup_featrue
+        return x
 
     def semi_loss(self, inputs: Tensor, data_samples: SampleList) -> dict:
         """Calculate losses from a batch of inputs and data samples.

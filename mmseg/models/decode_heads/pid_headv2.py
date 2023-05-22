@@ -171,13 +171,15 @@ class PIDHeadV2(BaseDecodeHead):
         sem_label = sem_label.squeeze(1)
         bd_label = bd_label.squeeze(1)
         loss['loss_sem_p'] = self.loss_decode[0](
-            p_logit, sem_label, ignore_index=self.ignore_index)
-        loss['loss_sem_i'] = self.loss_decode[1](i_logit, sem_label)
-        loss['loss_bd'] = self.loss_decode[2](d_logit, bd_label)
+            p_logit[self.sup_feature_idxs,...], sem_label, ignore_index=self.ignore_index)
+        loss['loss_sem_i'] = self.loss_decode[1](i_logit[self.sup_feature_idxs,...], sem_label)
+        loss['loss_bd'] = self.loss_decode[2](d_logit[self.sup_feature_idxs,...], bd_label)
         filler = torch.ones_like(sem_label) * self.ignore_index
         sem_bd_label = torch.where(
-            torch.sigmoid(d_logit[:, 0, :, :]) > 0.8, sem_label, filler)
-        loss['loss_sem_bd'] = self.loss_decode[3](i_logit, sem_bd_label)
+            torch.sigmoid(d_logit[self.sup_feature_idxs, 0, :, :]) > 0.8, sem_label, filler)
+        loss['loss_sem_bd'] = self.loss_decode[3](i_logit[self.sup_feature_idxs,...], sem_bd_label)
+        if len(self.loss_decode) >= 4 and type(self.loss_decode[4]).__name__ == 'MSEConsistencyLoss':
+            loss['loss_consistency_mse'] = self.loss_decode[4](i_logit)
         loss['acc_seg'] = accuracy(
-            i_logit, sem_label, ignore_index=self.ignore_index)
+            i_logit[self.sup_feature_idxs,...], sem_label, ignore_index=self.ignore_index)
         return loss
