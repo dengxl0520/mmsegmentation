@@ -209,29 +209,3 @@ class VideoEncoderDecoder(EncoderDecoder):
         x = self.semi_extract_feat(inputs)
         return self.decode_head.forward(x)
 
-    def generate_pseudo_label(self,inputs,data_samples):
-        """Use backbone and head generate pseudo label .
-        
-        """
-        # generate  
-        if data_samples is not None:
-            batch_img_metas = [
-                data_sample.metainfo for data_sample in data_samples
-            ]
-        else:
-            batch_img_metas = [
-                dict(
-                    ori_shape=inputs.shape[2:],
-                    img_shape=inputs.shape[2:],
-                    pad_shape=inputs.shape[2:],
-                    padding_size=[0, 0, 0, 0])
-            ] * inputs.shape[0]
-        x = self.backbone(inputs)
-        temp_p, out, temp_d = x
-        seg_logits = self.decode_head.predict(out, batch_img_metas,
-                                              self.test_cfg)
-        new_data_samples = []
-        # pack to new data samples
-
-        return new_data_samples
-
