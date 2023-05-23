@@ -180,6 +180,8 @@ class PIDHeadV2(BaseDecodeHead):
         loss['loss_sem_bd'] = self.loss_decode[3](i_logit[self.sup_feature_idxs,...], sem_bd_label)
         if len(self.loss_decode) > 4 and type(self.loss_decode[4]).__name__ == 'MSEConsistencyLoss':
             loss['loss_consistency_mse'] = self.loss_decode[4](i_logit)
+        if len(self.loss_decode) > 4 and type(self.loss_decode[4]).__name__ == 'ConsistencyLoss':
+            loss['loss_consistency'] = self.loss_decode[4](i_logit)
         loss['acc_seg'] = accuracy(
             i_logit[self.sup_feature_idxs,...], sem_label, ignore_index=self.ignore_index)
         return loss
