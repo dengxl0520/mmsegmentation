@@ -178,7 +178,7 @@ class PIDHeadV2(BaseDecodeHead):
         sem_bd_label = torch.where(
             torch.sigmoid(d_logit[self.sup_feature_idxs, 0, :, :]) > 0.8, sem_label, filler)
         loss['loss_sem_bd'] = self.loss_decode[3](i_logit[self.sup_feature_idxs,...], sem_bd_label)
-        if len(self.loss_decode) >= 4 and type(self.loss_decode[4]).__name__ == 'MSEConsistencyLoss':
+        if len(self.loss_decode) > 4 and type(self.loss_decode[4]).__name__ == 'MSEConsistencyLoss':
             loss['loss_consistency_mse'] = self.loss_decode[4](i_logit)
         loss['acc_seg'] = accuracy(
             i_logit[self.sup_feature_idxs,...], sem_label, ignore_index=self.ignore_index)

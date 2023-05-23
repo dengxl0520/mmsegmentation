@@ -7,9 +7,12 @@ from typing import List, Optional
 
 from torch import Tensor
 
+from mmengine.structures import PixelData
+from mmseg.structures import SegDataSample
 from mmseg.registry import MODELS
 from mmseg.utils import (ConfigType, OptConfigType, OptMultiConfig,
                          OptSampleList, SampleList, add_prefix)
+from ..utils import resize
 
 
 @MODELS.register_module()
@@ -106,15 +109,6 @@ class VideoEncoderDecoder(EncoderDecoder):
         if self.with_neck:
             x = self.semi_neck_forward(x)
 
-        # only use frames with anno
-        # if self.frame_length == len(self.label_idxs) :
-        #     sup_featrue = x
-        # elif isinstance(x, tuple) or isinstance(x, list):
-        #     if len(self.sup_feature_idxs) != len(x[0]): 
-        #         sup_featrue = [f[self.sup_feature_idxs, ...] for f in x]
-        # elif len(self.sup_feature_idxs) != len(x):
-        #     sup_featrue = x[self.sup_feature_idxs, ...]
-
         return x
 
     def semi_loss(self, inputs: Tensor, data_samples: SampleList) -> dict:
@@ -176,7 +170,7 @@ class VideoEncoderDecoder(EncoderDecoder):
         seg_logits = self.decode_head.predict(x, batch_img_metas,
                                               self.test_cfg)
 
-        return self.postprocess_result(seg_logits, data_samples)
+        return self.postprocess_result(seg_logits[self.sup_feature_idxs,...], data_samples)
 
     def _semi_forward(self,
                  inputs: Tensor,
