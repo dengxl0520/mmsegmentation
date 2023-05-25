@@ -89,8 +89,7 @@ class VideoEncoderDecoder(EncoderDecoder):
             temp = []
             for i in range(self.frame_length):
                 frame_idx = [i + j*self.frame_length for j in range(self.batchsize)]
-                _out = out[frame_idx,...]
-                after_neck_x = self.neck([_out])
+                after_neck_x = self.neck([out[frame_idx,...]])
                 temp.append(after_neck_x[0])
         # clear_memories
         self.neck.clear_memories()

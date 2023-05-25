@@ -135,7 +135,7 @@ class PackSegMultiInputs(BaseTransform):
                 data_sample = data_samples[i]
                 img_meta['frame_idx'] = img_meta['label_idxs'][i]
                 data_sample.set_metainfo(img_meta)
-                ori_img_data = dict(data=results['img'][i,...])
+                ori_img_data = dict(data=results['img'][img_meta['frame_idx'],...])
                 data_sample.set_data(dict(ori_img=PixelData(**ori_img_data)))
 
         packed_results['data_samples'] = data_samples

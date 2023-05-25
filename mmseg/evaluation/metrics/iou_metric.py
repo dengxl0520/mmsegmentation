@@ -1,14 +1,19 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import os.path as osp
 from collections import OrderedDict
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 import torch
-from mmengine.dist import is_main_process
+from torch import Tensor
+
+import logging
+from mmengine.dist import (broadcast_object_list, collect_results,
+                           is_main_process)
 from mmengine.evaluator import BaseMetric
 from mmengine.logging import MMLogger, print_log
 from mmengine.utils import mkdir_or_exist
+from mmengine.structures import BaseDataElement
 from PIL import Image
 from prettytable import PrettyTable
 
@@ -155,10 +160,61 @@ class IoUMetric(BaseMetric):
         for key, val in ret_metrics_class.items():
             class_table_data.add_column(key, val)
 
-        print_log('per class results:', logger)
         print_log('\n' + class_table_data.get_string(), logger=logger)
 
         return metrics
+
+    def evaluate(self, size: int) -> dict:
+        """Evaluate the model performance of the whole dataset after processing
+        all batches.
+
+        Args:
+            size (int): Length of the entire validation dataset. When batch
+                size > 1, the dataloader may pad some data samples to make
+                sure all ranks have the same length of dataset slice. The
+                ``collect_results`` function will drop the padded data based on
+                this size.
+
+        Returns:
+            dict: Evaluation metrics dict on the val dataset. The keys are the
+            names of the metrics, and the values are corresponding results.
+        """
+        if len(self.results) == 0:
+            print_log(
+                f'{self.__class__.__name__} got empty `self.results`. Please '
+                'ensure that the processed results are properly added into '
+                '`self.results` in `process` method.',
+                logger='current',
+                level=logging.WARNING)
+            
+        size = len(self.results)
+
+        results = collect_results(self.results, size, self.collect_device)
+
+        if is_main_process():
+            # cast all tensors in results list to cpu
+            results = _to_cpu(results)
+            print_log('per class results:', logger='current')
+            _metrics = self.compute_metrics(results)  # type: ignore
+            print_log('ED frames results:', logger='current')
+            self.compute_metrics(results[::2])  # type: ignore
+            print_log('ES frames results:', logger='current')
+            self.compute_metrics(results[1::2])  # type: ignore
+            # Add prefix to metric names
+            if self.prefix:
+                _metrics = {
+                    '/'.join((self.prefix, k)): v
+                    for k, v in _metrics.items()
+                }
+            metrics = [_metrics]
+        else:
+            metrics = [None]  # type: ignore
+
+        broadcast_object_list(metrics)
+
+        # reset the results list
+        self.results.clear()
+        return metrics[0]
 
     @staticmethod
     def intersect_and_union(pred_label: torch.tensor, label: torch.tensor,
@@ -284,3 +340,16 @@ class IoUMetric(BaseMetric):
                 for metric, metric_value in ret_metrics.items()
             })
         return ret_metrics
+
+def _to_cpu(data: Any) -> Any:
+    """transfer all tensors and BaseDataElement to cpu."""
+    if isinstance(data, (Tensor, BaseDataElement)):
+        return data.to('cpu')
+    elif isinstance(data, list):
+        return [_to_cpu(d) for d in data]
+    elif isinstance(data, tuple):
+        return tuple(_to_cpu(d) for d in data)
+    elif isinstance(data, dict):
+        return {k: _to_cpu(v) for k, v in data.items()}
+    else:
+        return data
