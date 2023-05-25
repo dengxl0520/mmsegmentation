@@ -49,6 +49,8 @@ class VideoEncoderDecoder(EncoderDecoder):
                 [label_idx + self.frame_length * i for label_idx in self.label_idxs])
             
         self.decode_head.sup_feature_idxs = self.sup_feature_idxs
+        self.decode_head.frame_length = self.frame_length
+        self.decode_head.batchsize = self.batchsize
 
         if self.input_type == 'img' and self.supervised == 'sup':
             return super().forward(inputs, data_samples, mode)
@@ -67,39 +69,38 @@ class VideoEncoderDecoder(EncoderDecoder):
                     'Only supports loss, predict and tensor mode')
     
     def semi_neck_forward(self, x: Tensor):
-        if self.with_neck:
-            assert len(x) == 3 and isinstance(x,tuple)
-            temp_p, out, temp_d = x
-            if len(out) == 3 and isinstance(out, tuple):
-                # no dfm
-                # multi_gpm forward
-                x_p, x_i, x_d = out
-                temp = []
-                for i in range(self.frame_length):
-                    frame_idx = [i + j*self.frame_length for j in range(self.batchsize)]
-                    _p = x_p[frame_idx,...]
-                    _i = x_i[frame_idx,...]
-                    _d = x_d[frame_idx,...]
-                    after_neck_x = self.neck([_p,_i,_d])
-                    temp.append(after_neck_x)
-            elif isinstance(out, Tensor):
-                # after dfm
-                # single_gpm forward
-                temp = []
-                for i in range(self.frame_length):
-                    frame_idx = [i + j*self.frame_length for j in range(self.batchsize)]
-                    _out = out[frame_idx,...]
-                    after_neck_x = self.neck([_out])
-                    temp.append(after_neck_x[0])
-            # clear_memories
-            self.neck.clear_memories()
-            # collect outputs
-            outputs = []
-            for i in range(self.batchsize):
-                for j in range(self.frame_length):
-                    outputs.append(temp[j][i,...])
-            outputs = torch.stack(outputs)
-            x = (temp_p, outputs, temp_d) if self.training else outputs
+        assert len(x) == 3 and isinstance(x,tuple)
+        temp_p, out, temp_d = x
+        if len(out) == 3 and isinstance(out, tuple):
+            # no dfm
+            # multi_gpm forward
+            x_p, x_i, x_d = out
+            temp = []
+            for i in range(self.frame_length):
+                frame_idx = [i + j*self.frame_length for j in range(self.batchsize)]
+                _p = x_p[frame_idx,...]
+                _i = x_i[frame_idx,...]
+                _d = x_d[frame_idx,...]
+                after_neck_x = self.neck([_p,_i,_d])
+                temp.append(after_neck_x)
+        elif isinstance(out, Tensor):
+            # after dfm
+            # single_gpm forward
+            temp = []
+            for i in range(self.frame_length):
+                frame_idx = [i + j*self.frame_length for j in range(self.batchsize)]
+                _out = out[frame_idx,...]
+                after_neck_x = self.neck([_out])
+                temp.append(after_neck_x[0])
+        # clear_memories
+        self.neck.clear_memories()
+        # collect outputs
+        outputs = []
+        for i in range(self.batchsize):
+            for j in range(self.frame_length):
+                outputs.append(temp[j][i,...])
+        outputs = torch.stack(outputs)
+        x = (temp_p, outputs, temp_d) if self.training else outputs
 
         return x 
             

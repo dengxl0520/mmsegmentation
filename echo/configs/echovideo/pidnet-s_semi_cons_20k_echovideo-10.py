@@ -1,7 +1,8 @@
 _base_ = [
-    '../_base_/default_runtime.py', '../_base_/datasets/echovideo-10.py',
+    '../_base_/default_runtime.py',
+    '../_base_/datasets/echovideo-10.py', 
     '../_base_/schedules/schedule_20k_cosinelr.py',
-    '../_base_/models/pidnet-s_gpm.py'
+    '../_base_/models/pidnet-s_semi.py'
 ]
 
 data_preprocessor = dict(
@@ -19,7 +20,7 @@ model = dict(
     input_type='video',
     supervised='semisup',
     data_preprocessor=data_preprocessor,
-    decode_head=dict(loss_decode=[
+        decode_head=dict(loss_decode=[
         dict(
             type='CrossEntropyLoss',
             use_sigmoid=False,
@@ -38,6 +39,6 @@ model = dict(
             min_kept=131072,
             class_weight=class_weight,
             loss_weight=1.0),
-        dict(type='MSEConsistencyLoss', loss_weight=1.0)
+        dict(type='ConsistencyLoss', loss_weight=1.0),
     ]),
 )
