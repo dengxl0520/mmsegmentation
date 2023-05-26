@@ -91,6 +91,12 @@ def main():
     # load config
     cfg = Config.fromfile(args.config)
     cfg.load_from = args.checkpoint
+    pipeline=[
+        dict(type='LoadNpyFile', frame_length=10, label_idxs=[0, 9]),
+        dict(type='VideoGenerateEdge', edge_width=4),
+        dict(type='TestPackSegMultiInputs')
+    ]
+    cfg.test_dataloader.dataset.pipeline = pipeline
 
     # build the runner from config
     runner = Runner.from_cfg(cfg)
@@ -112,23 +118,33 @@ def main():
 
     for idx, data_batch in enumerate(runner.test_loop.dataloader):
         outputs = runner.model.test_step(data_batch)
-        runner.test_loop.evaluator.process(
-            data_samples=outputs, data_batch=data_batch)
+
         drawn_imgs = []
         imgs_name = outputs[0].get('img_path').split('/')[-1].split(
             '.')[0] + ".png"
+        
         for data_sample in outputs:
             image = data_sample.get('ori_img').data.transpose(1, 2, 0)
 
-            sum_image = draw_sem_seg_sum(
-                seg_local_visualizer,
-                image,
-                data_sample.gt_sem_seg,
-                data_sample.pred_sem_seg,
-                classes,
-                gt_palette,
-                pred_palette)
-            
+            if 'gt_sem_seg' in data_sample:
+                sum_image = draw_sem_seg_sum(
+                    seg_local_visualizer,
+                    image,
+                    data_sample.gt_sem_seg,
+                    data_sample.pred_sem_seg,
+                    classes,
+                    gt_palette,
+                    pred_palette)
+
+            else:
+                sum_image = draw_sem_seg(
+                    seg_local_visualizer,
+                    image,
+                    data_sample.gt_sem_seg,
+                    classes,
+                    pred_palette
+                )
+
             seg_local_visualizer.set_image(image)
             ori_img = seg_local_visualizer.get_image()
 
