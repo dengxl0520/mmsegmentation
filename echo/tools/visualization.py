@@ -117,7 +117,12 @@ def main():
     seg_local_visualizer.dataset_meta = runner.test_evaluator.dataset_meta
 
     for idx, data_batch in enumerate(runner.test_loop.dataloader):
-        outputs = runner.model.test_step(data_batch)
+        model = runner.model 
+        data_preprocessor = runner.model.data_preprocessor
+
+        data = data_preprocessor(data_batch)
+        seg_logits = model._semi_forward(**data)
+        outputs = model.postprocess_result(seg_logits, data['data_samples'])
 
         drawn_imgs = []
         imgs_name = outputs[0].get('img_path').split('/')[-1].split(
@@ -140,7 +145,7 @@ def main():
                 sum_image = draw_sem_seg(
                     seg_local_visualizer,
                     image,
-                    data_sample.gt_sem_seg,
+                    data_sample.pred_sem_seg,
                     classes,
                     pred_palette
                 )
