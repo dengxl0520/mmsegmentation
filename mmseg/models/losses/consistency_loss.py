@@ -18,13 +18,13 @@ class ConsistencyLoss(nn.Module):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (
             reduction_override if reduction_override else self.reduction)
-        target1 = target[:-1]
-        target2 = target[1:]
+        target1 = F.softmax(target[:-1])
+        target2 = F.softmax(target[1:])
         loss1 = self.loss_weight * F.mse_loss(
             input=target2, target=target1, reduction=reduction)
         loss2 = self.loss_weight * F.kl_div(
-            input=F.log_softmax(target2),
-            target=F.log_softmax(target1),
+            input=target2,
+            target=target1,
             reduction=reduction,
             log_target=True)
         return loss1 + loss2
@@ -43,11 +43,11 @@ class KLConsistencyLoss(nn.Module):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (
             reduction_override if reduction_override else self.reduction)
-        target1 = target[:-1]
-        target2 = target[1:]
+        target1 = F.softmax(target[:-1])
+        target2 = F.softmax(target[1:])
         loss = self.loss_weight * F.kl_div(
-            input=F.log_softmax(target2),
-            target=F.log_softmax(target1),
+            input=target2,
+            target=target1,
             reduction=reduction,
             log_target=True)
         return loss
@@ -66,8 +66,8 @@ class MSEConsistencyLoss(nn.Module):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (
             reduction_override if reduction_override else self.reduction)
-        target1 = target[:-1]
-        target2 = target[1:]
+        target1 = F.softmax(target[:-1])
+        target2 = F.softmax(target[1:])
         loss = self.loss_weight * F.mse_loss(
             input=target2, target=target1, reduction=reduction)
         return loss
