@@ -1,5 +1,6 @@
 import argparse
-import mmcv
+import imageio
+import os
 import numpy as np
 from mmengine.config import Config
 from mmengine.runner import Runner
@@ -87,6 +88,8 @@ def main():
     # load config
     args = parse_args()
     save_dir = args.save_dir
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
     # load config
     cfg = Config.fromfile(args.config)
@@ -124,42 +127,28 @@ def main():
         seg_logits = model._semi_forward(**data)
         outputs = model.postprocess_result(seg_logits, data['data_samples'])
 
-        ori_imgs, sum_imgs= [], []
+        drawn_imgs = []
         imgs_name = outputs[0].get('img_path').split('/')[-1].split(
-            '.')[0] + ".png"
+            '.')[0] + ".gif"
         
         for data_sample in outputs:
             image = data_sample.get('ori_img').data.transpose(1, 2, 0)
-
-            if 'gt_sem_seg' in data_sample:
-                sum_image = draw_sem_seg_sum(
-                    seg_local_visualizer,
-                    image,
-                    data_sample.gt_sem_seg,
-                    data_sample.pred_sem_seg,
-                    classes,
-                    gt_palette,
-                    pred_palette)
-
-            else:
-                sum_image = draw_sem_seg(
-                    seg_local_visualizer,
-                    image,
-                    data_sample.pred_sem_seg,
-                    classes,
-                    pred_palette
-                )
+            sum_image = draw_sem_seg(
+                seg_local_visualizer,
+                image,
+                data_sample.pred_sem_seg,
+                classes,
+                pred_palette
+            )
 
             seg_local_visualizer.set_image(image)
             ori_image = seg_local_visualizer.get_image()
 
-            ori_imgs.append(ori_image)
-            sum_imgs.append(sum_image)
+            drawn_imgs.append(np.concatenate((ori_image, sum_image),
+                                    axis=1))
 
-        ori_imgs = np.concatenate(ori_imgs, axis=1)
-        sum_imgs = np.concatenate(sum_imgs, axis=1)
-        drawn_img = np.concatenate((ori_imgs, sum_imgs), axis=0)
-        mmcv.imwrite(mmcv.bgr2rgb(drawn_img), save_dir + imgs_name)
+        imageio.mimsave(save_dir + imgs_name, drawn_imgs, 'GIF', duration = 0.3)
+        
 
         
 if __name__ == '__main__':
