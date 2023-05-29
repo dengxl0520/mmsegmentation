@@ -16,7 +16,7 @@ class LossHook(Hook):
     def __init__(self, interval=1):
         self.interval = interval
 
-    def _before_iter(self,
+    def before_train_iter(self,
                      runner,
                      batch_idx: int,
                      data_batch: DATA_BATCH = None,
