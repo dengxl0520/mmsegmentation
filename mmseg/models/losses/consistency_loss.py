@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -7,7 +6,7 @@ from mmseg.registry import MODELS
 @MODELS.register_module()
 class ConsistencyLoss(nn.Module):
 
-    def __init__(self, reduction='mean', loss_weight=1.0) -> None:
+    def __init__(self, reduction='none', loss_weight=1.0) -> None:
         super(ConsistencyLoss, self).__init__()
         self.reduction = reduction
         self.loss_weight = loss_weight
@@ -18,21 +17,28 @@ class ConsistencyLoss(nn.Module):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (
             reduction_override if reduction_override else self.reduction)
-        target1 = F.softmax(target[:-1])
-        target2 = F.softmax(target[1:])
-        loss1 = self.loss_weight * F.mse_loss(
+        target = F.softmax(target, dim=2)
+        target1, target2 = target[:-1], target[1:]
+        f, bs, c, h, w = target1.shape
+        target1, target2 = target1.contiguous().view(-1,c,h,w), target2.contiguous().view(-1,c,h,w)
+        mse = F.mse_loss(
             input=target2, target=target1, reduction=reduction)
-        loss2 = self.loss_weight * F.kl_div(
-            input=target2,
-            target=target1,
+        loss1 = mse.sum() / (f*bs*c)
+        epsilon = 1e-8
+        target1_smooth = target1 + epsilon
+        target2_smooth = target2 + epsilon
+        kl =  F.kl_div(
+            input=target2_smooth.log(),
+            target=target1_smooth.log(),
             reduction=reduction,
             log_target=True)
-        return loss1 + loss2
+        loss2 = kl.mean()
+        return self.loss_weight * self.t * (loss1 + loss2)
 
 @MODELS.register_module()
 class KLConsistencyLoss(nn.Module):
 
-    def __init__(self, reduction='mean', loss_weight=1.0) -> None:
+    def __init__(self, reduction='none', loss_weight=1.0) -> None:
         super(KLConsistencyLoss, self).__init__()
         self.reduction = reduction
         self.loss_weight = loss_weight
@@ -43,19 +49,21 @@ class KLConsistencyLoss(nn.Module):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (
             reduction_override if reduction_override else self.reduction)
-        target1 = F.softmax(target[:-1])
-        target2 = F.softmax(target[1:])
-        loss = self.loss_weight * F.kl_div(
+        target = F.softmax(target, dim=2)
+        target1 = target[:-1]
+        target2 = target[1:]
+        kl =  F.kl_div(
             input=target2,
             target=target1,
             reduction=reduction,
             log_target=True)
-        return loss
+        loss = kl.sum()
+        return self.loss_weight * self.t * loss
 
 @MODELS.register_module()
 class MSEConsistencyLoss(nn.Module):
 
-    def __init__(self, reduction='mean', loss_weight=1.0) -> None:
+    def __init__(self, reduction='none', loss_weight=1.0) -> None:
         super(MSEConsistencyLoss, self).__init__()
         self.reduction = reduction
         self.loss_weight = loss_weight
@@ -66,8 +74,12 @@ class MSEConsistencyLoss(nn.Module):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (
             reduction_override if reduction_override else self.reduction)
-        target1 = F.softmax(target[:-1])
-        target2 = F.softmax(target[1:])
-        loss = self.loss_weight * F.mse_loss(
+        target = F.softmax(target, dim=2)
+        target1, target2 = target[:-1], target[1:]
+        f, bs, c, h, w = target1.shape
+        target1, target2 = target1.contiguous().view(-1,c,h,w), target2.contiguous().view(-1,c,h,w)
+        mse = F.mse_loss(
             input=target2, target=target1, reduction=reduction)
-        return loss
+        loss = mse.mean()
+        # return self.loss_weight * self.t * loss
+        return self.loss_weight * loss
