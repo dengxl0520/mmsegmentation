@@ -42,3 +42,7 @@ model = dict(
         dict(type='MSEConsistencyLoss', loss_weight=1.0),
     ]),
 )
+
+custom_hooks = [
+    dict(type='LossHook', interval=1)
+]

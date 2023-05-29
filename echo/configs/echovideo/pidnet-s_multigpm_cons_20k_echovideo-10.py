@@ -42,3 +42,6 @@ model = dict(
         dict(type='ConsistencyLoss', loss_weight=1.0)
     ]),
 )
+custom_hooks = [
+    dict(type='LossHook', interval=1)
+]
