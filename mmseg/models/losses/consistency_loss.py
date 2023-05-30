@@ -81,5 +81,4 @@ class MSEConsistencyLoss(nn.Module):
         mse = F.mse_loss(
             input=target2, target=target1, reduction=reduction)
         loss = mse.mean()
-        # return self.loss_weight * self.t * loss
-        return self.loss_weight * loss
+        return self.loss_weight * self.t * loss
