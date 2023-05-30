@@ -9,5 +9,7 @@ pip install -U openmim
 mim install mmengine
 mim install "mmcv>=2.0.0"
 ## mmseg
-cd mmseg
+cd mmsegmentation
 pip install -v -e .
+## others 
+pip install future tensorboard spatial-correlation-sampler

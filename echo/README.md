@@ -1,61 +1,67 @@
 # Echo
 
 ## TODO List:
-
 *一般*
 - [ ] 添加CAMUS数据集
-- [ ] 添加norm、数据增强等数据转换过程
-- [ ] 清晰的可视化图
-
 *重要*
 
 *紧急*
-- [ ] 写AOT、DeAOT的head
-- [ ] 完成半监督的forward,即重写encoder_decoder.py
-- [ ] 测试是否能可视化结果
-s
+- [ ] pidnet-s_semi、pidnet-s和pidnet-s_gpm对比
 
 ## NEXT 
-- PSPNet与PIDNet在echovideo做全监督对比
-  - 对比分割性能、训练时间、参数量、占用显存
-- 全监督与半监督对比
-  - sup&semisup，performance是否有提升
 - 在哪里可以改进？
   - long-term
-  - 时间帧的pos emb
-- 不用memories
-- 生成具有时间一致性的伪标记
-
-## NOW
-- 首先通过pidnet-s_2训练一个分割模型
-- 再在single-gpm或者multi-gpm进行半监督
-  1. 产生伪标签
-  2. 使用伪标签进行再训练
-## 下一个运行
-CUDA_VISIBLE_DEVICES=3 python tools/train.py echo/configs/echovideo/pidnet-s_gpm_50ep_echovideo-10.py
-
-CUDA_VISIBLE_DEVICES=3 python tools/test.py work_dirs/pidnet-s_multigpm_200ep_echovideo-10/pidnet-s_multigpm_200ep_echovideo-10.py work_dirs/pidnet-s_multigpm_200ep_echovideo-10/epoch_200.pth
-
-python tools/test.py work_dirs/pidnet-s_gpm_50ep_echovideo-2/pidnet-s_gpm_50ep_echovideo-2.py work_dirs/pidnet-s_gpm_50ep_echovideo-2/epoch_50.pth
-
-## preprocess echonet
-```
-python echo/tools/preprocess_echonet.py -i /data/dengxiaolong/EchoNet-Dynamic/ -o /data/dengxiaolong/mmseg/echonet1
-```
+  - 改进时空一致性损失
+    - 一致性损失：mse、kl
+  - 挖掘困难像素：边缘模糊
+  - 注意更小的物体？
+    - motivation：
+    - ed和es不平衡，差两个点
+    - 因为大小不一样，es更小，更容易被忽略
+    - 感觉需要通过时间emb来解决，更后的更小
+    - 
 
 ## train
-CUDA_VISIBLE_DEVICES=2;python tools/train.py echo/configs/echovideo/pidnet-s_multigpm_200ep_echovideo-10.py
+```bash
+CUDA_VISIBLE_DEVICES=1 python tools/train.py echo/configs/echovideo/pidnet-s_multigpm_cons_20k_echovideo-10.py
 
-CUDA_VISIBLE_DEVICES=2,3 bash tools/dist_train.sh echo/configs/echovideo/pidnet-s_multigpm_50ep_echovideo-10.py 2
-
+CUDA_VISIBLE_DEVICES=1,2,3 bash tools/dist_train.sh echo/configs/echovideo/pidnet-s_semi_cons_mse_20k_echovideo-10.py 3
+```
 ## test
-CUDA_VISIBLE_DEVICES=0 python tools/test.py \
-work_dirs/pspnet_r50-d8_20k_112x112_echonet/pspnet_r50-d8_20k_112x112_echonet.py \
-work_dirs/pspnet_r50-d8_20k_112x112_echonet/iter_20000.pth
-python tools/test.py \
-work_dirs/pspnet_r50-d8_200epoch_112x112_echocycle/pspnet_r50-d8_200epoch_112x112_echocycle.py \
-work_dirs/pspnet_r50-d8_200epoch_112x112_echocycle/epoch_200.pth
+```bash
+CUDA_VISIBLE_DEVICES=0 python tools/test.py
+```
 
-## MMseg tensorboard
-tensorboard --logdir work_dirs
-
+### MMseg hook
+#### vis hook
+```Python
+# vis
+default_hooks = dict(
+    visualization=dict(
+      type='SegNpyVisualizationHook', 
+      draw=True, 
+      interval=50)
+)
+```
+### tools
+#### preprocess echonet
+```bash
+python echo/tools/preprocess_echonet.py -i /data/dengxiaolong/EchoNet-Dynamic/ -o /data/dengxiaolong/mmseg/echonet1
+```
+#### tensorboard
+```bash
+conda activate openmmlab
+tensorboard --logdir=work_dirs --port=6035 --bind_all 
+```
+#### report metric
+```bash
+CUDA_VISIBLE_DEVICES=3 python echo/tools/report_metric.py  \
+work_dirs/pidnet-s_gpm_ConsL_20k_echovideo-10/pidnet-s_gpm_ConsL_20k_echovideo-10.py \
+work_dirs/pidnet-s_gpm_ConsL_20k_echovideo-10/iter_8000.pth
+```
+#### visualization
+```bash
+CUDA_VISIBLE_DEVICES=3 python echo/tools/visualization.py \
+work_dirs/pidnet-s_gpm_ConsL_20k_echovideo-10/pidnet-s_gpm_ConsL_20k_echovideo-10.py \
+work_dirs/pidnet-s_gpm_ConsL_20k_echovideo-10/iter_10000.pth 
+```
