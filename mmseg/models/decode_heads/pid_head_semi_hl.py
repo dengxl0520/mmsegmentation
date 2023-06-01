@@ -64,7 +64,7 @@ class BasePIDHead(BaseModule):
 
 
 @MODELS.register_module()
-class PIDHeadV2(BaseDecodeHead):
+class PIDHeadSemiHL(BaseDecodeHead):
     """Decode head for PIDNet.
 
     Args:
@@ -101,6 +101,9 @@ class PIDHeadV2(BaseDecodeHead):
         )
         self.p_cls_seg = nn.Conv2d(channels, self.out_channels, kernel_size=1)
         self.d_cls_seg = nn.Conv2d(in_channels // 4, 1, kernel_size=1)
+        self.weight_head = BasePIDHead(in_channels, channels, norm_cfg,
+                                       act_cfg)
+        self.weight_cls_seg = nn.Conv2d(in_channels, 1, kernel_size=1)
 
     def init_weights(self):
         for m in self.modules():
@@ -130,10 +133,13 @@ class PIDHeadV2(BaseDecodeHead):
         """
         if self.training:
             x_p, x_i, x_d = inputs
+            x_i_detach = x_i.detach()
             x_p = self.p_head(x_p, self.p_cls_seg)
             x_i = self.i_head(x_i, self.cls_seg)
             x_d = self.d_head(x_d, self.d_cls_seg)
-            return x_p, x_i, x_d
+            x_weight = self.weight_head(x_i_detach, self.weight_cls_seg)
+            return x_p, x_i, x_d, x_weight
+
         else:
             return self.i_head(inputs, self.cls_seg)
 
@@ -151,8 +157,9 @@ class PIDHeadV2(BaseDecodeHead):
     def loss_by_feat(self, seg_logits: Tuple[Tensor],
                      batch_data_samples: SampleList) -> dict:
         loss = dict()
-        p_logit, i_logit, d_logit = seg_logits
+        p_logit, i_logit, d_logit, HL_map = seg_logits
         sem_label, bd_label = self._stack_batch_gt(batch_data_samples)
+
         p_logit = resize(
             input=p_logit,
             size=sem_label.shape[2:],
@@ -168,27 +175,58 @@ class PIDHeadV2(BaseDecodeHead):
             size=bd_label.shape[2:],
             mode='bilinear',
             align_corners=self.align_corners)
-        sem_label = sem_label.squeeze(1)
-        bd_label = bd_label.squeeze(1)
-        loss['loss_sem_p'] = self.loss_decode[0](
-            p_logit[self.sup_feature_idxs,...], sem_label, ignore_index=self.ignore_index)
-        loss['loss_sem_i'] = self.loss_decode[1](i_logit[self.sup_feature_idxs,...], sem_label)
-        loss['loss_bd'] = self.loss_decode[2](d_logit[self.sup_feature_idxs,...], bd_label)
-        filler = torch.ones_like(sem_label) * self.ignore_index
-        sem_bd_label = torch.where(
-            torch.sigmoid(d_logit[self.sup_feature_idxs, 0, :, :]) > 0.8, sem_label, filler)
-        loss['loss_sem_bd'] = self.loss_decode[3](i_logit[self.sup_feature_idxs,...], sem_bd_label)
+        HL_map = resize(
+            input=HL_map,
+            size=sem_label.shape[2:],
+            mode='bilinear',
+            align_corners=self.align_corners)
+
+        # consistency loss
         bf, c, h, w = i_logit.shape
         assert bf == self.frame_length * self.batchsize
         for loss_func in self.loss_decode[4:]:
             if type(loss_func).__name__ == "MSEConsistencyLoss":
-                loss['loss_consistency_mse'] = loss_func(i_logit.view(self.frame_length,self.batchsize,c,h,w))            
-            elif type(loss_func).__name__ == "MSEConsistencyLoss1":
-                loss['loss_consistency_mse'] = loss_func(i_logit.view(self.frame_length,self.batchsize,c,h,w))
+                loss['loss_consistency_mse'] = loss_func(
+                    i_logit.view(self.frame_length, self.batchsize, c, h, w))
+            elif type(loss_func).__name__ == "AbsMSEConsistencyLoss":
+                loss['loss_consistency_mse'] = loss_func(
+                    i_logit.view(self.frame_length, self.batchsize, c, h, w))
             elif type(loss_func).__name__ == "KLConsistencyLoss":
-                loss['loss_consistency_kl'] = loss_func(i_logit.view(self.frame_length,self.batchsize,c,h,w))
+                loss['loss_consistency_kl'] = loss_func(
+                    i_logit.view(self.frame_length, self.batchsize, c, h, w))
             elif type(loss_func).__name__ == "ConsistencyLoss":
-                loss['loss_consistency'] = loss_func(i_logit.view(self.frame_length,self.batchsize,c,h,w))  
+                loss['loss_consistency'] = loss_func(
+                    i_logit.view(self.frame_length, self.batchsize, c, h, w))
+
+        p_logit = p_logit[self.sup_feature_idxs, ...]
+        i_logit = i_logit[self.sup_feature_idxs, ...]
+        d_logit = d_logit[self.sup_feature_idxs, ...]
+        HL_map = HL_map[self.sup_feature_idxs, ...]
+
+        # HL_map
+        HL_map = resize(
+            input=HL_map,
+            size=sem_label.shape[2:],
+            mode='bilinear',
+            align_corners=self.align_corners)
+        HL_map = torch.sigmoid(HL_map) + 0.1
+        HL_map = HL_map / (HL_map.mean())
+        HL_map_detach = HL_map.clone().detach()
+
+        sem_label = sem_label.squeeze(1)
+        bd_label = bd_label.squeeze(1)
+        loss_sem_p = self.loss_decode[0](
+            p_logit, sem_label, ignore_index=self.ignore_index)
+        loss_sem_p_detach = loss_sem_p.detach()
+        loss['loss_sem_p'] = (loss_sem_p * HL_map_detach).mean()
+        loss['loss_sem_p_weight'] = -0.01 * ((HL_map * loss_sem_p_detach).mean())
+        loss['loss_sem_i'] = self.loss_decode[1](i_logit, sem_label)
+        loss['loss_bd'] = self.loss_decode[2](d_logit, bd_label)
+        # bd
+        filler = torch.ones_like(sem_label) * self.ignore_index
+        sem_bd_label = torch.where(
+            torch.sigmoid(d_logit[:, 0, :, :]) > 0.8, sem_label, filler)
+        loss['loss_sem_bd'] = self.loss_decode[3](i_logit, sem_bd_label)
         loss['acc_seg'] = accuracy(
-            i_logit[self.sup_feature_idxs,...], sem_label, ignore_index=self.ignore_index)
+            i_logit, sem_label, ignore_index=self.ignore_index)
         return loss

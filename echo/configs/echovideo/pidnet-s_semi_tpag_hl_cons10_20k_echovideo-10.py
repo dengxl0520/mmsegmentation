@@ -2,7 +2,7 @@ _base_ = [
     '../_base_/default_runtime.py',
     '../_base_/datasets/echovideo-10.py', 
     '../_base_/schedules/schedule_20k_cosinelr.py',
-    '../_base_/models/pidnet-s_semi.py'
+    '../_base_/models/pidnet-s_semi_hl_tpag.py'
 ]
 
 data_preprocessor = dict(
@@ -16,7 +16,7 @@ data_preprocessor = dict(
 
 class_weight = [1, 1]
 model = dict(
-    type='VideoEncoderDecoder',
+    type='HLVideoEncoderDecoder',
     input_type='video',
     supervised='semisup',
     data_preprocessor=data_preprocessor,
@@ -39,7 +39,7 @@ model = dict(
             min_kept=131072,
             class_weight=class_weight,
             loss_weight=1.0),
-        dict(type='MSEConsistencyLoss', loss_weight=1.0),
+        dict(type='AbsMSEConsistencyLoss', loss_weight=10.0),
     ]),
 )
 

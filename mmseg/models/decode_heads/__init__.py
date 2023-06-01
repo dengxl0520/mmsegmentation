@@ -33,6 +33,7 @@ from .setr_up_head import SETRUPHead
 from .stdc_head import STDCHead
 from .uper_head import UPerHead
 from .pid_headv2 import PIDHeadV2
+from .pid_head_semi_hl import PIDHeadSemiHL
 
 __all__ = [
     'FCNHead', 'PSPHead', 'ASPPHead', 'PSAHead', 'NLHead', 'GCHead', 'CCHead',
