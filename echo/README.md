@@ -43,7 +43,7 @@
 ```bash
 CUDA_VISIBLE_DEVICES=1 python tools/train.py echo/configs/echovideo/pidnet-s_multigpm_cons_20k_echovideo-10.py
 
-CUDA_VISIBLE_DEVICES=1,2,3 bash tools/dist_train.sh echo/configs/echovideo/pidnet-s_semi_cons_mse_20k_echovideo-10.py 3
+CUDA_VISIBLE_DEVICES=1,2,3 bash tools/dist_train.sh echo/configs/echovideo/pidnet-s_semi_hl_20k_echovideo-10.py 3
 ```
 ## test
 ```bash

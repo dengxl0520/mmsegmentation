@@ -34,7 +34,7 @@ from .transforms import (CLAHE, AdjustGamma, BioMedical3DPad,
                          ResizeToMultiple, RGB2Gray, SegRescale)
 from .voc import PascalVOCDataset
 from .echonet import EchonetDataset
-from .echocycle import EchonetSupDataset, EchonetSemiSupDataset, EchonetVideoDataset
+from .echocycle import EchonetVideoDataset
 
 # yapf: enable
 __all__ = [

@@ -3,6 +3,7 @@ from typing import Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
+import math
 from mmcv.cnn import ConvModule, build_activation_layer, build_norm_layer
 from mmengine.model import BaseModule
 from torch import Tensor
@@ -101,9 +102,9 @@ class PIDHeadSemiHL(BaseDecodeHead):
         )
         self.p_cls_seg = nn.Conv2d(channels, self.out_channels, kernel_size=1)
         self.d_cls_seg = nn.Conv2d(in_channels // 4, 1, kernel_size=1)
-        self.weight_head = BasePIDHead(in_channels, channels, norm_cfg,
+        self.weight_head = BasePIDHead(in_channels // 2, channels, norm_cfg,
                                        act_cfg)
-        self.weight_cls_seg = nn.Conv2d(in_channels, 1, kernel_size=1)
+        self.weight_cls_seg = nn.Conv2d(channels, 1, kernel_size=1)
 
     def init_weights(self):
         for m in self.modules():
@@ -133,11 +134,11 @@ class PIDHeadSemiHL(BaseDecodeHead):
         """
         if self.training:
             x_p, x_i, x_d = inputs
-            x_i_detach = x_i.detach()
+            x_p_detach = x_p.detach()
             x_p = self.p_head(x_p, self.p_cls_seg)
             x_i = self.i_head(x_i, self.cls_seg)
             x_d = self.d_head(x_d, self.d_cls_seg)
-            x_weight = self.weight_head(x_i_detach, self.weight_cls_seg)
+            x_weight = self.weight_head(x_p_detach, self.weight_cls_seg)
             return x_p, x_i, x_d, x_weight
 
         else:
@@ -187,16 +188,16 @@ class PIDHeadSemiHL(BaseDecodeHead):
         for loss_func in self.loss_decode[4:]:
             if type(loss_func).__name__ == "MSEConsistencyLoss":
                 loss['loss_consistency_mse'] = loss_func(
-                    i_logit.view(self.frame_length, self.batchsize, c, h, w))
+                    i_logit.contiguous().view(self.frame_length, self.batchsize, c, h, w))
             elif type(loss_func).__name__ == "AbsMSEConsistencyLoss":
                 loss['loss_consistency_mse'] = loss_func(
-                    i_logit.view(self.frame_length, self.batchsize, c, h, w))
+                    i_logit.contiguous().view(self.frame_length, self.batchsize, c, h, w))
             elif type(loss_func).__name__ == "KLConsistencyLoss":
                 loss['loss_consistency_kl'] = loss_func(
-                    i_logit.view(self.frame_length, self.batchsize, c, h, w))
+                    i_logit.contiguous().view(self.frame_length, self.batchsize, c, h, w))
             elif type(loss_func).__name__ == "ConsistencyLoss":
                 loss['loss_consistency'] = loss_func(
-                    i_logit.view(self.frame_length, self.batchsize, c, h, w))
+                    i_logit.contiguous().view(self.frame_length, self.batchsize, c, h, w))
 
         p_logit = p_logit[self.sup_feature_idxs, ...]
         i_logit = i_logit[self.sup_feature_idxs, ...]
@@ -204,11 +205,6 @@ class PIDHeadSemiHL(BaseDecodeHead):
         HL_map = HL_map[self.sup_feature_idxs, ...]
 
         # HL_map
-        HL_map = resize(
-            input=HL_map,
-            size=sem_label.shape[2:],
-            mode='bilinear',
-            align_corners=self.align_corners)
         HL_map = torch.sigmoid(HL_map) + 0.1
         HL_map = HL_map / (HL_map.mean())
         HL_map_detach = HL_map.clone().detach()
@@ -220,6 +216,11 @@ class PIDHeadSemiHL(BaseDecodeHead):
         loss_sem_p_detach = loss_sem_p.detach()
         loss['loss_sem_p'] = (loss_sem_p * HL_map_detach).mean()
         loss['loss_sem_p_weight'] = -0.01 * ((HL_map * loss_sem_p_detach).mean())
+        # i_logit
+        i_seg_pred = i_logit.detach().argmax(dim=1,keepdim=True).half()
+        i_seg_pred_mean = torch.cos(torch.mean(i_seg_pred, dim=[2,3], keepdim=True) * math.pi / 2)
+        i_logit = i_logit * i_seg_pred_mean
+
         loss['loss_sem_i'] = self.loss_decode[1](i_logit, sem_label)
         loss['loss_bd'] = self.loss_decode[2](d_logit, bd_label)
         # bd
