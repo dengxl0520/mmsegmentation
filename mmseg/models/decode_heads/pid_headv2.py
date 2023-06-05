@@ -168,27 +168,21 @@ class PIDHeadV2(BaseDecodeHead):
             size=bd_label.shape[2:],
             mode='bilinear',
             align_corners=self.align_corners)
+        
+        p_logit = p_logit[self.sup_feature_idxs, ...]
+        i_logit = i_logit[self.sup_feature_idxs, ...]
+        d_logit = d_logit[self.sup_feature_idxs, ...]
+
         sem_label = sem_label.squeeze(1)
         bd_label = bd_label.squeeze(1)
         loss['loss_sem_p'] = self.loss_decode[0](
-            p_logit[self.sup_feature_idxs,...], sem_label, ignore_index=self.ignore_index)
-        loss['loss_sem_i'] = self.loss_decode[1](i_logit[self.sup_feature_idxs,...], sem_label)
-        loss['loss_bd'] = self.loss_decode[2](d_logit[self.sup_feature_idxs,...], bd_label)
+            p_logit, sem_label, ignore_index=self.ignore_index)
+        loss['loss_sem_i'] = self.loss_decode[1](i_logit, sem_label)
+        loss['loss_bd'] = self.loss_decode[2](d_logit, bd_label)
         filler = torch.ones_like(sem_label) * self.ignore_index
         sem_bd_label = torch.where(
-            torch.sigmoid(d_logit[self.sup_feature_idxs, 0, :, :]) > 0.8, sem_label, filler)
-        loss['loss_sem_bd'] = self.loss_decode[3](i_logit[self.sup_feature_idxs,...], sem_bd_label)
-        bf, c, h, w = i_logit.shape
-        assert bf == self.frame_length * self.batchsize
-        for loss_func in self.loss_decode[4:]:
-            if type(loss_func).__name__ == "MSEConsistencyLoss":
-                loss['loss_consistency_mse'] = loss_func(i_logit.view(self.frame_length,self.batchsize,c,h,w))            
-            elif type(loss_func).__name__ == "MSEConsistencyLoss1":
-                loss['loss_consistency_mse'] = loss_func(i_logit.view(self.frame_length,self.batchsize,c,h,w))
-            elif type(loss_func).__name__ == "KLConsistencyLoss":
-                loss['loss_consistency_kl'] = loss_func(i_logit.view(self.frame_length,self.batchsize,c,h,w))
-            elif type(loss_func).__name__ == "ConsistencyLoss":
-                loss['loss_consistency'] = loss_func(i_logit.view(self.frame_length,self.batchsize,c,h,w))  
+            torch.sigmoid(d_logit[:, 0, :, :]) > 0.8, sem_label, filler)
+        loss['loss_sem_bd'] = self.loss_decode[3](i_logit, sem_bd_label)
         loss['acc_seg'] = accuracy(
-            i_logit[self.sup_feature_idxs,...], sem_label, ignore_index=self.ignore_index)
+            i_logit, sem_label, ignore_index=self.ignore_index)
         return loss
