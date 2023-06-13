@@ -169,6 +169,12 @@ class PIDHeadV2(BaseDecodeHead):
             mode='bilinear',
             align_corners=self.align_corners)
         
+        bf, c, h, w = i_logit.shape
+        assert bf == self.frame_length * self.batchsize
+        for loss_func in self.loss_decode[4:]:
+            if type(loss_func).__name__ == "TempConsistencyLoss":
+                loss['loss_temp_consistency'] = loss_func(i_logit.view(self.frame_length, self.batchsize, c, h, w))
+
         p_logit = p_logit[self.sup_feature_idxs, ...]
         i_logit = i_logit[self.sup_feature_idxs, ...]
         d_logit = d_logit[self.sup_feature_idxs, ...]

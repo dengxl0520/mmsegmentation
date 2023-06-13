@@ -182,22 +182,28 @@ class PIDHeadSemiHL(BaseDecodeHead):
             mode='bilinear',
             align_corners=self.align_corners)
 
-        # consistency loss
         bf, c, h, w = i_logit.shape
         assert bf == self.frame_length * self.batchsize
         for loss_func in self.loss_decode[4:]:
-            if type(loss_func).__name__ == "MSEConsistencyLoss":
-                loss['loss_consistency_mse'] = loss_func(
-                    i_logit.contiguous().view(self.frame_length, self.batchsize, c, h, w))
-            elif type(loss_func).__name__ == "AbsMSEConsistencyLoss":
-                loss['loss_consistency_mse'] = loss_func(
-                    i_logit.contiguous().view(self.frame_length, self.batchsize, c, h, w))
-            elif type(loss_func).__name__ == "KLConsistencyLoss":
-                loss['loss_consistency_kl'] = loss_func(
-                    i_logit.contiguous().view(self.frame_length, self.batchsize, c, h, w))
-            elif type(loss_func).__name__ == "ConsistencyLoss":
-                loss['loss_consistency'] = loss_func(
-                    i_logit.contiguous().view(self.frame_length, self.batchsize, c, h, w))
+            if type(loss_func).__name__ == "TempConsistencyLoss":
+                loss['loss_temp_consistency'] = loss_func(i_logit.view(self.frame_length, self.batchsize, c, h, w))
+
+        # consistency loss
+        # bf, c, h, w = i_logit.shape
+        # assert bf == self.frame_length * self.batchsize
+        # for loss_func in self.loss_decode[4:]:
+        #     if type(loss_func).__name__ == "MSEConsistencyLoss":
+        #         loss['loss_consistency_mse'] = loss_func(
+        #             i_logit.contiguous().view(self.frame_length, self.batchsize, c, h, w))
+        #     elif type(loss_func).__name__ == "AbsMSEConsistencyLoss":
+        #         loss['loss_consistency_mse'] = loss_func(
+        #             i_logit.contiguous().view(self.frame_length, self.batchsize, c, h, w))
+        #     elif type(loss_func).__name__ == "KLConsistencyLoss":
+        #         loss['loss_consistency_kl'] = loss_func(
+        #             i_logit.contiguous().view(self.frame_length, self.batchsize, c, h, w))
+        #     elif type(loss_func).__name__ == "ConsistencyLoss":
+        #         loss['loss_consistency'] = loss_func(
+        #             i_logit.contiguous().view(self.frame_length, self.batchsize, c, h, w))
 
         p_logit = p_logit[self.sup_feature_idxs, ...]
         i_logit = i_logit[self.sup_feature_idxs, ...]
@@ -217,9 +223,9 @@ class PIDHeadSemiHL(BaseDecodeHead):
         loss['loss_sem_p'] = (loss_sem_p * HL_map_detach).mean()
         loss['loss_sem_p_weight'] = -0.01 * ((HL_map * loss_sem_p_detach).mean())
         # i_logit
-        i_seg_pred = i_logit.detach().argmax(dim=1,keepdim=True).half()
-        i_seg_pred_mean = torch.cos(torch.mean(i_seg_pred, dim=[2,3], keepdim=True) * math.pi / 2)
-        i_logit = i_logit * i_seg_pred_mean
+        # i_seg_pred = i_logit.detach().argmax(dim=1,keepdim=True).half()
+        # i_seg_pred_mean = torch.cos(torch.mean(i_seg_pred, dim=[2,3], keepdim=True) * math.pi / 2)
+        # i_logit = i_logit * i_seg_pred_mean
 
         loss['loss_sem_i'] = self.loss_decode[1](i_logit, sem_label)
         loss['loss_bd'] = self.loss_decode[2](d_logit, bd_label)
