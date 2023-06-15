@@ -5,6 +5,7 @@ from .encoder_decoder import EncoderDecoder
 from .video_encoder_decoder import VideoEncoderDecoder
 from .hl_video_encoder_decoder import HLVideoEncoderDecoder
 from .tpag_hl_video_encoder_decoder import TPagHLVideoEncoderDecoder
+from .semi_video_encoder_decoder import SemiVideoEncoderDecoder
 from .seg_tta import SegTTAModel
 
 __all__ = [
