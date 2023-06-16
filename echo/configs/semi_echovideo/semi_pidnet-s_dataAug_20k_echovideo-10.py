@@ -49,8 +49,7 @@ model = dict(
                 thres=0.9,
                 min_kept=131072,
                 class_weight=class_weight,
-                loss_weight=1.0),        
-            dict(type='TempConsistencyLoss', loss_weight=1.0),
+                loss_weight=1.0),
         ]),
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
@@ -79,7 +78,7 @@ default_hooks = dict(
     timer=dict(type='IterTimerHook'),
     logger=dict(type='LoggerHook', log_metric_by_epoch=False, interval=20),
     param_scheduler=dict(type='ParamSchedulerHook'),
-    checkpoint=dict(type='CheckpointHook', by_epoch=False, interval=2000, max_keep_ckpts=5),
+    checkpoint=dict(type='CheckpointHook', by_epoch=False, interval=2000),
     sampler_seed=dict(type='DistSamplerSeedHook'))
 
 # dataset settings
@@ -89,6 +88,8 @@ data_root = 'data/echonet/echocycle'
 train_pipeline = [
     dict(type='LoadNpyFile', frame_length=10, label_idxs=[0,9]),
     dict(type='VideoGenerateEdge', edge_width=2),
+    dict(type='VideoPhotoMetricDistortion'),
+    dict(type='VideoRandomFlip', prob=0.5),
     dict(type='PackSegMultiInputs')
 ]
 test_pipeline = [

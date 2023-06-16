@@ -8,6 +8,7 @@ from .multilevel_neck import MultiLevelNeck
 from .multi_gpm import MultiGPM
 from .gpm import GPM
 from .tpag import TPag
+from .tbgm import TemporalBoundaryGuidedMoudle
 
 __all__ = [
     'FPN', 'MultiLevelNeck', 'MLANeck', 'ICNeck', 'JPU', 'Feature2Pyramid'

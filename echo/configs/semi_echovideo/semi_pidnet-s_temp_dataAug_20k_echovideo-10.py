@@ -89,6 +89,8 @@ data_root = 'data/echonet/echocycle'
 train_pipeline = [
     dict(type='LoadNpyFile', frame_length=10, label_idxs=[0,9]),
     dict(type='VideoGenerateEdge', edge_width=2),
+    dict(type='VideoPhotoMetricDistortion'),
+    dict(type='VideoRandomFlip', prob=0.5),
     dict(type='PackSegMultiInputs')
 ]
 test_pipeline = [

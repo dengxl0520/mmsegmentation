@@ -23,6 +23,14 @@ model = dict(
         norm_cfg=norm_cfg,
         act_cfg=dict(type='ReLU', inplace=True),
         init_cfg=dict(type='Pretrained', checkpoint=checkpoint_file)),
+    neck=dict(
+        type='TemporalBoundaryGuidedMoudle',
+        in_channels=128,
+        channels=128,
+        kernel_size=1,
+        norm_cfg=dict(type='BN'),
+        act_cfg=dict(type='ReLU',inplace=True),
+    ),
     decode_head=dict(
         type='PIDHeadSemi',
         in_channels=128,

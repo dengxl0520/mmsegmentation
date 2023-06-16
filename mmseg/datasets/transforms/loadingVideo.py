@@ -1,5 +1,6 @@
 from typing import Optional, Dict
 import numpy as np
+from numpy import random
 
 import mmcv
 
@@ -85,7 +86,6 @@ class LoadNpyFile(BaseTransform):
         results['ori_shape'] = imgs.shape[2:]
 
         return results
-    
 
 @TRANSFORMS.register_module()
 class PackSegMultiInputs(BaseTransform):
@@ -100,7 +100,7 @@ class PackSegMultiInputs(BaseTransform):
         packed_results = dict()
 
         if 'img' in results:
-            imgs = [to_tensor(img) for img in results['img']]
+            imgs = [to_tensor(img).contiguous() for img in results['img']]
             packed_results['inputs'] = imgs
 
         data_samples = []
@@ -121,7 +121,6 @@ class PackSegMultiInputs(BaseTransform):
                 gt_edge_data = dict(data=mask_edge)
                 data_samples[i].set_data(dict(gt_edge_map=PixelData(**gt_edge_data)))
             
-                
         img_meta = {}
         for key in self.meta_keys:
             if key in results:
@@ -137,61 +136,6 @@ class PackSegMultiInputs(BaseTransform):
                 data_sample.set_metainfo(img_meta)
                 ori_img_data = dict(data=results['img'][img_meta['frame_idx'],...])
                 data_sample.set_data(dict(ori_img=PixelData(**ori_img_data)))
-
-        packed_results['data_samples'] = data_samples
-        return packed_results
-
-@TRANSFORMS.register_module()
-class TestPackSegMultiInputs(BaseTransform):
-    def __init__(self,
-                 meta_keys=('img_path', 'seg_map_path', 'ori_shape',
-                            'img_shape', 'pad_shape', 'scale_factor', 'flip',
-                            'flip_direction', 'reduce_zero_label','frame_length',
-                            'label_idxs')):
-        self.meta_keys = meta_keys
-
-    def transform(self, results: dict) -> dict:
-        packed_results = dict()
-
-        data_samples = []
-        if 'img' in results:
-            imgs = [to_tensor(img) for img in results['img']]
-            packed_results['inputs'] = imgs
-            for img in results['img']:
-                data_sample = SegEchoDataSample()
-                ori_img_data = dict(data=img)
-                data_sample.set_data(dict(ori_img=PixelData(**ori_img_data)))
-                data_samples.append(data_sample)
-
-        assert 'label_idxs' in results
-        if 'masks' in results:
-            for i in range(len(results['masks'])):
-                mask = results['masks'][i]
-                mask = to_tensor(mask.astype(np.int64))
-                mask.unsqueeze_(0)
-                gt_sem_seg_data = dict(data=mask)
-                data_samples[results['label_idxs'][i]].set_data(dict(gt_sem_seg=PixelData(**gt_sem_seg_data)))
-
-        if 'masks_edge' in results:
-            for i in range(len(results['masks_edge'])):
-                mask_edge = results['masks_edge'][i]
-                mask_edge = to_tensor(mask_edge.astype(np.int64))
-                mask_edge.unsqueeze_(0)
-                gt_edge_data = dict(data=mask_edge)
-                data_samples[results['label_idxs'][i]].set_data(dict(gt_edge_map=PixelData(**gt_edge_data)))
-            
-        img_meta = {}
-        for key in self.meta_keys:
-            if key in results:
-                img_meta[key] = results[key]
-        
-        if 'ef' in results:
-            img_meta['ef'] = to_tensor(results['ef'].astype(np.float32))
-        
-        if 'label_idxs' in img_meta:
-            for i, data_sample in enumerate(data_samples):
-                img_meta['frame_idx'] = i
-                data_sample.set_metainfo(img_meta)
 
         packed_results['data_samples'] = data_samples
         return packed_results
@@ -232,7 +176,6 @@ class VideoGenerateEdge(GenerateEdge):
         results['masks_edge'] = mask_edge
         return results
 
-
 @TRANSFORMS.register_module()
 class VideoRandomResize(RandomResize):
     def transform(self, results: dict) -> dict:
@@ -250,12 +193,21 @@ class VideoRandomFlip(RandomFlip):
             results['flip_direction'] = cur_dir
 
             # flip imgs
-            results['imgs'] = mmcv.imflip(img=results['imgs'], direction=cur_dir)
-
+            if 'img' in results:
+                imgs = results['img'].transpose(0,2,3,1)
+                for i, img in enumerate(imgs):
+                    imgs[i] = mmcv.imflip(img=img, direction=cur_dir)
+                results['img'] = imgs.transpose(0,3,1,2)
             # filp masks
-            results['masks'] = mmcv.imflip(img=results['masks'], direction=cur_dir)
+            if 'masks' in results:
+                masks = results['masks'].transpose(1,2,0)
+                masks = mmcv.imflip(img=masks, direction=cur_dir)
+                results['masks'] = masks.transpose(2,0,1)
+            # filp masks_edge
+            if 'masks_edge' in results:
+                for i, mask_edge in enumerate(results['masks_edge']):
+                    results['masks_edge'][i] = mmcv.imflip(img=mask_edge, direction=cur_dir)
         return results
-
 
 @TRANSFORMS.register_module()
 class VideoRandomCrop(RandomCrop):
@@ -264,57 +216,64 @@ class VideoRandomCrop(RandomCrop):
 
 @TRANSFORMS.register_module()
 class VideoPhotoMetricDistortion(PhotoMetricDistortion):
+    def hue(self, imgs: np.ndarray) -> np.ndarray:
+        """Hue distortion.
+
+        Args:
+            imgs (np.ndarray): The input image.
+        Returns:
+            np.ndarray: Image after hue change.
+        """
+
+        if random.randint(2):
+            for i, img  in enumerate(imgs):
+                img = mmcv.bgr2hsv(img)
+                img[:, :,
+                    0] = (img[:, :, 0].astype(int) +
+                        random.randint(-self.hue_delta, self.hue_delta)) % 180
+                imgs[i] = mmcv.hsv2bgr(img)
+        return imgs
+
+    def saturation(self, imgs: np.ndarray) -> np.ndarray:
+        """Saturation distortion.
+
+        Args:
+            imgs (np.ndarray): The input image.
+        Returns:
+            np.ndarray: Image after saturation change.
+        """
+
+        if random.randint(2):
+            for i, img  in enumerate(imgs):
+                img = mmcv.bgr2hsv(img)
+                img[:, :, 1] = self.convert(
+                    img[:, :, 1],
+                    alpha=random.uniform(self.saturation_lower,
+                                        self.saturation_upper))
+                imgs[i] = mmcv.hsv2bgr(img)
+        return imgs
+
     def transform(self, results: dict) -> dict:
-        results['img'] = results['imgs'][0]
-        results = super().transform(results)
+        imgs = results['img']
+        imgs = imgs.transpose(0,2,3,1)
+        # random brightness
+        imgs = self.brightness(imgs)
+
+        # mode == 0 --> do random contrast first
+        # mode == 1 --> do random contrast last
+        mode = random.randint(2)
+        if mode == 1:
+            imgs = self.contrast(imgs)
+
+        # random saturation
+        imgs = self.saturation(imgs)
+
+        # random hue
+        imgs = self.hue(imgs)
+
+        # random contrast
+        if mode == 0:
+            imgs = self.contrast(imgs)
+
+        results['img'] = imgs.transpose(0,3,1,2)
         return results
-
-
-@TRANSFORMS.register_module()
-class PackSegVideoInputs(BaseTransform):
-    def __init__(self,
-                 meta_keys=('img_path', 'seg_map_path', 'ori_shape',
-                            'img_shape', 'pad_shape', 'scale_factor', 'flip',
-                            'flip_direction', 'reduce_zero_label')):
-        self.meta_keys = meta_keys
-
-    def transform(self, results: dict) -> dict:
-        packed_results = dict()
-        if 'imgs' in results:
-            imgs = results['imgs'].copy()
-            imgs = to_tensor(imgs)
-            packed_results['inputs'] = imgs
-
-        data_sample = SegEchoDataSample()
-        if 'masks' in results:
-            frame1 = to_tensor(results['masks'][0,:,:].astype(np.int64))
-            frame1.unsqueeze_(0)
-            frame2 = to_tensor(results['masks'][1,:,:].astype(np.int64))
-            frame2.unsqueeze_(0)
-            # use first frame and last frame
-            ori_frame1 = results['ori_imgs'][0,:,:,:]
-            ori_frame2 = results['ori_imgs'][-1,:,:,:]
-            gt_sem_seg_data = dict(frame1=frame1, frame2=frame2, ori_frame1=ori_frame1, ori_frame2=ori_frame2)
-            data_sample.gt_sem_seg = PixelData(**gt_sem_seg_data)
-        if 'masks_edge' in results:
-            frame1_edge = to_tensor(results['masks_edge'][0].astype(np.int64))
-            frame1_edge.unsqueeze_(0)
-            frame2_edge = to_tensor(results['masks_edge'][1].astype(np.int64))
-            frame2_edge.unsqueeze_(0)
-            gt_edge_data = dict(frame1_edge=frame1_edge,
-                frame2_edge=frame2_edge)
-            data_sample.set_data(dict(gt_edge_map=PixelData(**gt_edge_data)))
-
-                
-        img_meta = {}
-        for key in self.meta_keys:
-            if key in results:
-                img_meta[key] = results[key]
-        
-        img_meta['ef'] = to_tensor(results['ef'].astype(np.float32))
-        img_meta['frameidx'] = '0'
-                
-        data_sample.set_metainfo(img_meta)
-    
-        packed_results['data_samples'] = data_sample
-        return packed_results

@@ -42,9 +42,15 @@ class SemiVideoEncoderDecoder(EncoderDecoder):
             self.sup_feature_idxs.extend(
                 [label_idx + self.frame_length * i for label_idx in self.label_idxs])
             
-        self.decode_head.sup_feature_idxs = self.sup_feature_idxs
-        self.decode_head.frame_length = self.frame_length
-        self.decode_head.batchsize = self.batchsize
+        if self.with_neck:
+            self.neck.sup_feature_idxs = self.sup_feature_idxs
+            self.neck.frame_length = self.frame_length
+            self.neck.batchsize = self.batchsize
+            
+        if self.with_decode_head:
+            self.decode_head.sup_feature_idxs = self.sup_feature_idxs
+            self.decode_head.frame_length = self.frame_length
+            self.decode_head.batchsize = self.batchsize
 
         if mode == 'loss':
             return self.semi_loss(inputs, data_samples)
