@@ -32,7 +32,9 @@ class TemporalBoundaryGuidedMoudle(nn.Module):
         p, sem, boundary = inputs
         _, _, h, w = boundary.shape
         boundary = boundary.view(self.frame_length, self.batchsize, -1, h, w)
-        b_concat = torch.cat((boundary[:-1,...], boundary[1:,...]), dim=2)
+        b_1 = boundary[:-1,...].clone()
+        b_2 = boundary[1:,...].clone()
+        b_concat = torch.cat((b_1, b_2), dim=2)
         b_concat = b_concat.view((self.frame_length-1)*self.batchsize, -1, h, w)
         b_concat = self.conv(b_concat)
 
@@ -40,13 +42,13 @@ class TemporalBoundaryGuidedMoudle(nn.Module):
         s_1 = sem[:-1,...].view((self.frame_length-1)*self.batchsize, -1, h, w)
         s_2 = sem[1:,...].view((self.frame_length-1)*self.batchsize, -1, h, w)
 
-        b_concat = b_concat * s_1 + s_2
-        b_concat = b_concat.view(self.frame_length-1, self.batchsize, -1, h, w)
-        sem[:-1,...] = b_concat
+        s_2 = b_concat * s_1 + s_2
+        # b_concat = b_concat.view(self.frame_length-1, self.batchsize, -1, h, w)
+        # sem[:-1,...] = b_concat
 
         sem = sem.view(self.frame_length*self.batchsize, -1, h, w)
         boundary = boundary.view(self.frame_length*self.batchsize, -1, h, w)
         sem = self.norm(sem)
         sem = self.act(sem)
-        return (p, sem, boundary)
+        return (p, sem, boundary) if self.training else sem
 
