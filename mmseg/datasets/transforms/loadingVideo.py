@@ -141,6 +141,62 @@ class PackSegMultiInputs(BaseTransform):
         return packed_results
 
 @TRANSFORMS.register_module()
+class TestPackSegMultiInputs(BaseTransform):
+    def __init__(self,
+                 meta_keys=('img_path', 'seg_map_path', 'ori_shape',
+                            'img_shape', 'pad_shape', 'scale_factor', 'flip',
+                            'flip_direction', 'reduce_zero_label','frame_length',
+                            'label_idxs')):
+        self.meta_keys = meta_keys
+
+    def transform(self, results: dict) -> dict:
+        packed_results = dict()
+
+        data_samples = []
+        if 'img' in results:
+            imgs = [to_tensor(img) for img in results['img']]
+            packed_results['inputs'] = imgs
+            for img in results['img']:
+                data_sample = SegEchoDataSample()
+                ori_img_data = dict(data=img)
+                data_sample.set_data(dict(ori_img=PixelData(**ori_img_data)))
+                data_samples.append(data_sample)
+
+        assert 'label_idxs' in results
+        if 'masks' in results:
+            for i in range(len(results['masks'])):
+                mask = results['masks'][i]
+                mask = to_tensor(mask.astype(np.int64))
+                mask.unsqueeze_(0)
+                gt_sem_seg_data = dict(data=mask)
+                data_samples[results['label_idxs'][i]].set_data(dict(gt_sem_seg=PixelData(**gt_sem_seg_data)))
+
+        if 'masks_edge' in results:
+            for i in range(len(results['masks_edge'])):
+                mask_edge = results['masks_edge'][i]
+                mask_edge = to_tensor(mask_edge.astype(np.int64))
+                mask_edge.unsqueeze_(0)
+                gt_edge_data = dict(data=mask_edge)
+                data_samples[results['label_idxs'][i]].set_data(dict(gt_edge_map=PixelData(**gt_edge_data)))
+            
+        img_meta = {}
+        for key in self.meta_keys:
+            if key in results:
+                img_meta[key] = results[key]
+        
+        if 'ef' in results:
+            img_meta['ef'] = to_tensor(results['ef'].astype(np.float32))
+        
+        if 'label_idxs' in img_meta:
+            for i, data_sample in enumerate(data_samples):
+                img_meta['frame_idx'] = i
+                data_sample.set_metainfo(img_meta)
+
+        packed_results['data_samples'] = data_samples
+        return packed_results
+
+
+@TRANSFORMS.register_module()
 class LoadVideoAndAnnoFromFile(BaseTransform):
     '''Load n frames video from .npy file
         args:
