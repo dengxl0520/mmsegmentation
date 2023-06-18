@@ -3,6 +3,7 @@ from numbers import Number
 from typing import Any, Dict, List, Optional, Sequence
 
 import torch
+import torch.nn.functional as F
 from mmengine.model import BaseDataPreprocessor
 
 from mmseg.registry import MODELS
@@ -153,6 +154,7 @@ class SegDataPreProcessor(BaseDataPreprocessor):
 
 @MODELS.register_module()
 class SegDataPreProcessorV2(SegDataPreProcessor):
+
     def forward(self, data: dict, training: bool = False) -> Dict[str, Any]:
         """Perform normalization、padding and bgr2rgb conversion based on
         ``BaseDataPreprocessor``.
@@ -167,7 +169,7 @@ class SegDataPreProcessorV2(SegDataPreProcessor):
         data = self.cast_data(data)  # type: ignore
         inputs = data['inputs']
         data_samples = data.get('data_samples', None)
-        # check type 
+        # check type
         inputs_new = []
         data_samples_new = []
         if isinstance(inputs[0], tuple):
@@ -220,11 +222,13 @@ class SegDataPreProcessorV2(SegDataPreProcessor):
         #     else:
         #         inputs = torch.stack(inputs, dim=0)
 
-        return dict(inputs=torch.stack(inputs, dim=0), data_samples=data_samples)
+        return dict(
+            inputs=torch.stack(inputs, dim=0), data_samples=data_samples)
 
-    
+
 @MODELS.register_module()
 class SegVideoPreProcessor(SegDataPreProcessor):
+
     def forward(self, data: dict, training: bool = False) -> Dict[str, Any]:
         """Perform normalization、padding and bgr2rgb conversion based on
         ``BaseDataPreprocessor``.
@@ -239,7 +243,7 @@ class SegVideoPreProcessor(SegDataPreProcessor):
         data = self.cast_data(data)  # type: ignore
         inputs = data['inputs']
         data_samples = data.get('data_samples', None)
-        # check type 
+        # check type
         inputs_new = []
         data_samples_new = []
         if isinstance(inputs[0], tuple):
@@ -261,35 +265,10 @@ class SegVideoPreProcessor(SegDataPreProcessor):
         if self._enable_normalize:
             inputs = [(_input - self.mean) / self.std for _input in inputs]
 
-        # if training:
-        #     assert data_samples is not None, ('During training, ',
-        #                                       '`data_samples` must be define.')
-        #     inputs, data_samples = stack_batch(
-        #         inputs=inputs,
-        #         data_samples=data_samples,
-        #         size=self.size,
-        #         size_divisor=self.size_divisor,
-        #         pad_val=self.pad_val,
-        #         seg_pad_val=self.seg_pad_val)
+        inputs = torch.stack(inputs, dim=0)
+        # resize inputs
+        if inputs.shape[-2:] != self.size:
+            inputs = F.interpolate(
+                inputs, size=self.size, mode='bilinear', align_corners=False)
 
-        #     if self.batch_augments is not None:
-        #         inputs, data_samples = self.batch_augments(
-        #             inputs, data_samples)
-        # else:
-        #     assert len(inputs) == 1, (
-        #         'Batch inference is not support currently, '
-        #         'as the image size might be different in a batch')
-        #     # pad images when testing
-        #     if self.test_cfg:
-        #         inputs, padded_samples = stack_batch(
-        #             inputs=inputs,
-        #             size=self.test_cfg.get('size', None),
-        #             size_divisor=self.test_cfg.get('size_divisor', None),
-        #             pad_val=self.pad_val,
-        #             seg_pad_val=self.seg_pad_val)
-        #         for data_sample, pad_info in zip(data_samples, padded_samples):
-        #             data_sample.set_metainfo({**pad_info})
-        #     else:
-        #         inputs = torch.stack(inputs, dim=0)
-
-        return dict(inputs=torch.stack(inputs, dim=0), data_samples=data_samples)
+        return dict(inputs=inputs, data_samples=data_samples)

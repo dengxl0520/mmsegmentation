@@ -68,6 +68,7 @@ class SemiVideoEncoderDecoder(EncoderDecoder):
         x = self.backbone(inputs)
         if self.with_neck:
             x = self.neck(x)
+        x = [i[self.sup_feature_idxs,...] for i in x]
         return x
 
     def semi_loss(self, inputs: Tensor, data_samples: SampleList) -> dict:
@@ -129,7 +130,7 @@ class SemiVideoEncoderDecoder(EncoderDecoder):
         seg_logits = self.decode_head.predict(x, batch_img_metas,
                                               self.test_cfg)
 
-        return self.postprocess_result(seg_logits[self.sup_feature_idxs,...], data_samples)
+        return self.postprocess_result(seg_logits, data_samples)
 
     def _semi_forward(self,
                  inputs: Tensor,
