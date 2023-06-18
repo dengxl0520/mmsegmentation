@@ -121,7 +121,8 @@ def main():
         data_preprocessor = runner.model.data_preprocessor
 
         data = data_preprocessor(data_batch)
-        seg_logits = model._semi_forward(**data)
+        # seg_logits = model._semi_forward(**data)
+        seg_logits = model._semi_forward(inputs=data['inputs'], data_samples=data['data_samples'])
         outputs = model.postprocess_result(seg_logits, data['data_samples'])
 
         ori_imgs, sum_imgs= [], []
