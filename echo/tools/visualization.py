@@ -122,8 +122,15 @@ def main():
 
         data = data_preprocessor(data_batch)
         # seg_logits = model._semi_forward(**data)
-        seg_logits = model._semi_forward(inputs=data['inputs'], data_samples=data['data_samples'])
-        outputs = model.postprocess_result(seg_logits, data['data_samples'])
+        if runner.model.with_neck:
+            runner.model.neck.frame_length = len(data['inputs'])
+            runner.model.neck.batchsize = 1
+        if runner.model.with_decode_head:
+            runner.model.decode_head.frame_length = len(data['inputs'])
+            runner.model.decode_head.batchsize = 1
+
+        outputs = model.predict(inputs=data['inputs'], data_samples=data['data_samples'])
+        # outputs = model.postprocess_result(seg_logits, data['data_samples'])
 
         ori_imgs, sum_imgs= [], []
         imgs_name = outputs[0].get('img_path').split('/')[-1].split(

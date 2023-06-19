@@ -52,6 +52,11 @@ class SemiVideoEncoderDecoder(EncoderDecoder):
             self.decode_head.frame_length = self.frame_length
             self.decode_head.batchsize = self.batchsize
 
+        if self.with_auxiliary_head:
+            self.auxiliary_head.sup_feature_idxs = self.sup_feature_idxs
+            self.auxiliary_head.frame_length = self.frame_length
+            self.auxiliary_head.batchsize = self.batchsize
+
         if mode == 'loss':
             return self.semi_loss(inputs, data_samples)
         elif mode == 'predict':
@@ -62,15 +67,51 @@ class SemiVideoEncoderDecoder(EncoderDecoder):
             raise RuntimeError(
                 f'Invalid mode "{mode}". '
                 'Only supports loss, predict and tensor mode')
-                
+
+    def extract_feat(self, inputs: Tensor) -> List[Tensor]:
+        """Extract features from images."""
+        x = self.backbone(inputs)
+        if self.with_neck:
+            x = self.neck(x)
+        return x
+    
+    def predict(self,
+                inputs: Tensor,
+                data_samples: OptSampleList = None) -> SampleList:
+        if data_samples is not None:
+            batch_img_metas = [
+                data_sample.metainfo for data_sample in data_samples
+            ]
+        else:
+            batch_img_metas = [
+                dict(
+                    ori_shape=inputs.shape[2:],
+                    img_shape=inputs.shape[2:],
+                    pad_shape=inputs.shape[2:],
+                    padding_size=[0, 0, 0, 0])
+            ] * inputs.shape[0]
+
+        x = self.semi_extract_feat(inputs)
+
+        seg_logits = self.decode_head.predict(x, batch_img_metas,
+                                              self.test_cfg)
+
+        return self.postprocess_result(seg_logits, data_samples)
+    
+    def _forward(self,
+                 inputs: Tensor,
+                 data_samples: OptSampleList = None) -> Tensor:
+        x = self.semi_extract_feat(inputs)
+
+        return self.decode_head.forward(x, data_samples)
+     
     def semi_extract_feat(self, inputs: Tensor) -> List[Tensor]:
         """Extract features from images."""
         x = self.backbone(inputs)
         if self.with_neck:
             x = self.neck(x)
-        x = [i[self.sup_feature_idxs,...] for i in x]
         return x
-
+    
     def semi_loss(self, inputs: Tensor, data_samples: SampleList) -> dict:
         """Calculate losses from a batch of inputs and data samples.
 
@@ -87,6 +128,12 @@ class SemiVideoEncoderDecoder(EncoderDecoder):
         x = self.semi_extract_feat(inputs)
 
         losses = dict()
+        if self.with_auxiliary_head:
+            loss_aux = self.auxiliary_head.loss(x, data_samples, self.train_cfg)
+            losses.update(add_prefix(loss_aux, 'aux'))
+            
+        x = [i[self.sup_feature_idxs,...] for i in x]
+
         loss_decode = self.decode_head.loss(x, data_samples,
                                             self.train_cfg)
 
@@ -127,25 +174,17 @@ class SemiVideoEncoderDecoder(EncoderDecoder):
             ] * inputs.shape[0]
 
         x = self.semi_extract_feat(inputs)
+        x = [i[self.sup_feature_idxs,...] for i in x]
+
         seg_logits = self.decode_head.predict(x, batch_img_metas,
                                               self.test_cfg)
 
         return self.postprocess_result(seg_logits, data_samples)
-
+    
     def _semi_forward(self,
                  inputs: Tensor,
                  data_samples: OptSampleList = None) -> Tensor:
-        """Network forward process.
-
-        Args:
-            inputs (Tensor): Inputs with shape (N, C, H, W).
-            data_samples (List[:obj:`SegDataSample`]): The seg
-                data samples. It usually includes information such
-                as `metainfo` and `gt_sem_seg`.
-
-        Returns:
-            Tensor: Forward output of model without any post-processes.
-        """
         x = self.semi_extract_feat(inputs)
-        return self.decode_head.forward(x)
+        x = [i[self.sup_feature_idxs,...] for i in x]
 
+        return self.decode_head.forward(x)
