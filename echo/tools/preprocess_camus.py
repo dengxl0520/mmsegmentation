@@ -12,6 +12,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input_dir', type=str, default='/data/dengxiaolong/camus/training')
     parser.add_argument('-o', '--output_dir', type=str, default='/data/dengxiaolong/mmseg/camus')
+    parser.add_argument('-f', '--split_file', type=str, default='echo/tools/train_val_test.json')
     args = parser.parse_args()
 
     return args
@@ -47,7 +48,7 @@ def split(data:list, ratios:list):
         start += point
     return splits
 
-def preprocess_data(input_path, output_path):
+def preprocess_data(input_path, output_path, split_file):
     # hyperparam
     resize_size = (320,320)
     # generate video name
@@ -56,10 +57,17 @@ def preprocess_data(input_path, output_path):
     for patient_num in patient_num_list:
         video_name_list.append(patient_num + '_2CH')
         video_name_list.append(patient_num + '_4CH')
-    
-    # split dataset 
-    data_split = split(data=video_name_list, ratios=[0.7,0.1,0.2])
-    train_split, val_split, test_split = data_split
+
+    # split dataset
+    if split_file:
+        # from split file
+        with open(split_file, 'r') as f:
+            data = json.load(f)
+            train_split, val_split, test_split = data['train'],data['val'],data['test']
+    else:
+        # random split
+        data_split = split(data=video_name_list, ratios=[0.7,0.1,0.2])
+        train_split, val_split, test_split = data_split
 
     # create folder
     if not os.path.exists(output_path + '/videos'):
@@ -95,11 +103,19 @@ def preprocess_data(input_path, output_path):
 
         # read annotations
         # assert int(cfg['ED']) < int(cfg['ES'])
-        ED = sitk.ReadImage(os.path.join(video_path , video_name + '_ED_gt.mhd'))
-        ES = sitk.ReadImage(os.path.join(video_path , video_name + '_ES_gt.mhd'))
+        ed = sitk.ReadImage(os.path.join(video_path , video_name + '_ED_gt.mhd'))
+        ed_np = sitk.GetArrayFromImage(ed)
+        resize_ed = cv2.resize(ed_np[0], resize_size)
+        resize_ed[resize_ed != 1] = 0
+
+        es = sitk.ReadImage(os.path.join(video_path , video_name + '_ES_gt.mhd'))
+        es_np = sitk.GetArrayFromImage(es)
+        resize_es = cv2.resize(es_np[0], resize_size)
+        resize_es[resize_es != 1] = 0
+
         frame_pairs_mask = {
-            cfg['ED']: ED,
-            cfg['ES']: ES
+            str(int(cfg['ED']) -1): resize_ed,
+            str(int(cfg['ES']) -1): resize_es
         }
             
         # save
@@ -137,7 +153,6 @@ def preprocess_data(input_path, output_path):
     for name in test_split:
         output_file_test.write(name + '\n')
 
-
 if __name__ == '__main__':
     args = parse_args()
 
@@ -147,4 +162,5 @@ if __name__ == '__main__':
         os.makedirs(args.output_dir)
 
     preprocess_data(input_path=args.input_dir,
-                    output_path=args.output_dir)
+                    output_path=args.output_dir,
+                    split_file=args.split_file)
