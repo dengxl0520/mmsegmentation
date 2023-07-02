@@ -85,6 +85,13 @@ default_hooks = dict(
 ```bash
 python echo/tools/preprocess_echonet.py -i /data/dengxiaolong/EchoNet-Dynamic/ -o /data/dengxiaolong/mmseg/echonet1
 ```
+#### preprocess camus
+```bash
+# split from json file
+python echo/tools/preprocess_camus.py -i /data/dengxiaolong/camus/training -o /data/dengxiaolong/mmseg/camus -f echo/tools/train_val_test.json
+# random split 
+python echo/tools/preprocess_camus.py -i /data/dengxiaolong/camus/training -o /data/dengxiaolong/mmseg/camus_random
+```
 #### tensorboard
 ```bash
 conda activate openmmlab

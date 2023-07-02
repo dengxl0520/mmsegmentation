@@ -35,6 +35,7 @@ from .transforms import (CLAHE, AdjustGamma, BioMedical3DPad,
 from .voc import PascalVOCDataset
 from .echonet import EchonetDataset
 from .echocycle import EchonetVideoDataset
+from .camus import CAMUSVideoDataset
 
 # yapf: enable
 __all__ = [
@@ -53,5 +54,6 @@ __all__ = [
     'BioMedicalGaussianNoise', 'BioMedicalGaussianBlur',
     'BioMedicalRandomGamma', 'BioMedical3DPad', 'RandomRotFlip',
     'SynapseDataset', 'REFUGEDataset', 'MapillaryDataset_v1',
-    'MapillaryDataset_v2'
+    'MapillaryDataset_v2', 'EchonetDataset', 'EchonetVideoDataset', 
+    'CAMUSVideoDataset'
 ]
