@@ -9,11 +9,11 @@ from .lovasz_loss import LovaszLoss
 from .ohem_cross_entropy_loss import OhemCrossEntropy
 from .tversky_loss import TverskyLoss
 from .utils import reduce_loss, weight_reduce_loss, weighted_loss
-from .consistency_loss import ConsistencyLoss, MSEConsistencyLoss, KLConsistencyLoss,MSEConsistencyLoss1,TempConsistencyLoss
+from .consistency_loss import ConsistencyLoss, MSEConsistencyLoss, KLConsistencyLoss,MSEConsistencyLoss1,TempConsistencyLoss, TempConsistencyLoss1
 
 __all__ = [
     'accuracy', 'Accuracy', 'cross_entropy', 'binary_cross_entropy',
     'mask_cross_entropy', 'CrossEntropyLoss', 'reduce_loss',
     'weight_reduce_loss', 'weighted_loss', 'LovaszLoss', 'DiceLoss',
-    'FocalLoss', 'TverskyLoss', 'OhemCrossEntropy', 'BoundaryLoss','TempConsistencyLoss'
+    'FocalLoss', 'TverskyLoss', 'OhemCrossEntropy', 'BoundaryLoss','TempConsistencyLoss','TempConsistencyLoss1'
 ]

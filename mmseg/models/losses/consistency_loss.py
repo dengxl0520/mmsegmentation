@@ -3,7 +3,29 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from mmseg.registry import MODELS
+@MODELS.register_module()
+class TempConsistencyLoss1(nn.Module):
+    def __init__(self, reduction='none', loss_weight=1.0) -> None:
+        super(TempConsistencyLoss1, self).__init__()
+        self.reduction = reduction
+        self.loss_weight = loss_weight
 
+    def forward(self,
+                target,
+                reduction_override=None):
+        assert reduction_override in (None, 'none', 'mean', 'sum')
+        reduction = (
+            reduction_override if reduction_override else self.reduction)
+
+        target_pred = torch.sigmoid(target)
+        target_pred1 = target_pred[:-1,...]
+        target_pred2 = target_pred[1:,...]
+        loss1 = -1. * (target_pred1*target_pred2 + (1-target_pred1)*(1-target_pred2)).log()
+        loss2 = -1. * (target_pred[0]*target_pred[-1] + (1-target_pred[0])*(1-target_pred[-1])).log()
+
+        return (loss1+loss2).mean()
+
+    
 @MODELS.register_module()
 class TempConsistencyLoss(nn.Module):
     def __init__(self, reduction='none', loss_weight=1.0) -> None:
