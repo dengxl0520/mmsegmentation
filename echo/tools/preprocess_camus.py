@@ -8,6 +8,10 @@ import numpy as np
 import configparser
 import random
 
+SEED = 1234
+RESIZE_SIZE = (320,320)
+SPLIT_RATIOS = [0.7,0.1,0.2]
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input_dir', type=str, default='/data/dengxiaolong/camus/training')
@@ -39,7 +43,7 @@ def read_cfg(path):
 def split(data:list, ratios:list):
     total_length = len(data)
     split_points = [int(ratio * total_length) for ratio in ratios]
-    random.seed(0)
+    random.seed(SEED)
     random.shuffle(data)
     splits = []
     start = 0
@@ -50,7 +54,7 @@ def split(data:list, ratios:list):
 
 def preprocess_data(input_path, output_path, split_file):
     # hyperparam
-    resize_size = (320,320)
+    resize_size = RESIZE_SIZE
     # generate video name
     patient_num_list = generate_list()
     video_name_list = []
@@ -66,7 +70,7 @@ def preprocess_data(input_path, output_path, split_file):
             train_split, val_split, test_split = data['train'],data['val'],data['test']
     else:
         # random split
-        data_split = split(data=video_name_list, ratios=[0.7,0.1,0.2])
+        data_split = split(data=video_name_list, ratios=SPLIT_RATIOS)
         train_split, val_split, test_split = data_split
 
     # create folder

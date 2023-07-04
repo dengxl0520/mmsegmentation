@@ -9,6 +9,7 @@ def parse_args():
         description='MMSeg test (and eval) a model')
     parser.add_argument('config', help='train config file path')
     parser.add_argument('checkpoint', help='checkpoint file')
+    parser.add_argument('--dataset', help='dataset', default='test')
     args = parser.parse_args()
 
     return args
@@ -30,10 +31,17 @@ def main():
     runner.call_hook('before_val_epoch')
     runner.model.eval()
 
-    for idx, data_batch in enumerate(runner.test_loop.dataloader):
-        outputs = runner.model.test_step(data_batch)
-        runner.test_loop.evaluator.process(
-            data_samples=outputs, data_batch=data_batch)
+    if args.dataset == 'test':
+        for idx, data_batch in enumerate(runner.test_loop.dataloader):
+            outputs = runner.model.test_step(data_batch)
+            runner.test_loop.evaluator.process(
+                data_samples=outputs, data_batch=data_batch)
+    elif args.dataset == 'val':
+        for idx, data_batch in enumerate(runner.val_loop.dataloader):
+            outputs = runner.model.test_step(data_batch)
+            runner.test_loop.evaluator.process(
+                data_samples=outputs, data_batch=data_batch)
+
         
     # compute metrics
     for metric in runner.test_loop.evaluator.metrics:
