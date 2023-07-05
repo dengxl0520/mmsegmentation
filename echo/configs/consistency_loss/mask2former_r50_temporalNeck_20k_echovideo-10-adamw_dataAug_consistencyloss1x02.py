@@ -23,8 +23,8 @@ randomness = dict(seed=1234)
 cfg=dict(compile=True)
 
 # dataset settings
-dataset_type = 'CAMUSVideoDataset'
-data_root = 'data/camus_random1234'
+dataset_type = 'EchonetVideoDataset'
+data_root = 'data/echonet/echocycle'
 # pipeline
 train_pipeline = [
     dict(type='LoadNpyFile', frame_length=10, label_idxs=[0,9]),
@@ -38,7 +38,7 @@ test_pipeline = [
 ]
 # dataloader
 train_dataloader = dict(
-    batch_size=2,
+    batch_size=8,
     num_workers=8,
     persistent_workers=True,
     sampler=dict(type='InfiniteSampler', shuffle=True),
@@ -49,7 +49,7 @@ train_dataloader = dict(
             img_path='videos/train', seg_map_path='annotations/train'),
         pipeline=train_pipeline))
 val_dataloader = dict(
-    batch_size=1,
+    batch_size=8,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=False),
@@ -83,7 +83,7 @@ data_preprocessor = dict(
     bgr_to_rgb=True,
     pad_val=0,
     seg_pad_val=255,
-    size=(320, 320))
+    size=(128, 128))
 num_classes = 2
 model = dict(
     type='SemiVideoEncoderDecoder',
@@ -98,9 +98,30 @@ model = dict(
         norm_cfg=dict(type='SyncBN', requires_grad=False),
         style='pytorch',
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
+    neck=dict(
+        type='TemporalNeck',
+        input_shape={
+            'res2':{
+                "channels":256,
+                "stride":4
+            },
+            'res3':{
+                "channels":512,
+                "stride":8
+            },
+            'res4':{
+                "channels":1024,
+                "stride":16
+            },
+            'res5':{
+                "channels":2048,
+                "stride":32
+            },
+        },
+    ),
     decode_head=dict(
         type='Mask2FormerHead',
-        in_channels=[256, 512, 1024, 2048],
+        in_channels=[256, 256, 256, 256],
         strides=[4, 8, 16, 32],
         feat_channels=256,
         out_channels=256,
@@ -204,6 +225,20 @@ model = dict(
                         eps=1.0)
                 ]),
             sampler=dict(type='mmdet.MaskPseudoSampler'))),
+    auxiliary_head=dict(
+        type='ASPPHead',
+        in_channels=256,
+        channels=128,
+        num_classes=num_classes,
+        dilations=(1, 12, 24, 36),
+        dropout_ratio=0.1,
+        norm_cfg=dict(type='SyncBN', requires_grad=False),
+        align_corners=False,
+        loss_decode=dict(
+            type='TempConsistencyLoss1',
+            loss_weight=0.2
+        )
+    ),
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
 

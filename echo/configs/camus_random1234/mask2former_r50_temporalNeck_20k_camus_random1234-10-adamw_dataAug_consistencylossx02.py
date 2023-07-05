@@ -98,9 +98,30 @@ model = dict(
         norm_cfg=dict(type='SyncBN', requires_grad=False),
         style='pytorch',
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
+    neck=dict(
+        type='TemporalNeck',
+        input_shape={
+            'res2':{
+                "channels":256,
+                "stride":4
+            },
+            'res3':{
+                "channels":512,
+                "stride":8
+            },
+            'res4':{
+                "channels":1024,
+                "stride":16
+            },
+            'res5':{
+                "channels":2048,
+                "stride":32
+            },
+        },
+    ),
     decode_head=dict(
         type='Mask2FormerHead',
-        in_channels=[256, 512, 1024, 2048],
+        in_channels=[256, 256, 256, 256],
         strides=[4, 8, 16, 32],
         feat_channels=256,
         out_channels=256,
@@ -204,6 +225,20 @@ model = dict(
                         eps=1.0)
                 ]),
             sampler=dict(type='mmdet.MaskPseudoSampler'))),
+    auxiliary_head=dict(
+        type='ASPPHead',
+        in_channels=256,
+        channels=128,
+        num_classes=num_classes,
+        dilations=(1, 12, 24, 36),
+        dropout_ratio=0.1,
+        norm_cfg=dict(type='SyncBN', requires_grad=False),
+        align_corners=False,
+        loss_decode=dict(
+            type='TempConsistencyLoss',
+            loss_weight=0.2
+        )
+    ),
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
 

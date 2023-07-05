@@ -204,6 +204,20 @@ model = dict(
                         eps=1.0)
                 ]),
             sampler=dict(type='mmdet.MaskPseudoSampler'))),
+    auxiliary_head=dict(
+        type='ASPPHead',
+        in_channels=2048,
+        channels=128,
+        num_classes=num_classes,
+        dilations=(1, 12, 24, 36),
+        dropout_ratio=0.1,
+        norm_cfg=dict(type='SyncBN', requires_grad=False),
+        align_corners=False,
+        loss_decode=dict(
+            type='TempConsistencyLoss',
+            loss_weight=0.2
+        )
+    ),
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
 

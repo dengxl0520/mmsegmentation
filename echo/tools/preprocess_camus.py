@@ -16,7 +16,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input_dir', type=str, default='/data/dengxiaolong/camus/training')
     parser.add_argument('-o', '--output_dir', type=str, default='/data/dengxiaolong/mmseg/camus')
-    parser.add_argument('-f', '--split_file', type=str, default='echo/tools/train_val_test.json')
+    parser.add_argument('-f', '--split_file', type=str)
     args = parser.parse_args()
 
     return args
