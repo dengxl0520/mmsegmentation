@@ -9,7 +9,8 @@ from .lovasz_loss import LovaszLoss
 from .ohem_cross_entropy_loss import OhemCrossEntropy
 from .tversky_loss import TverskyLoss
 from .utils import reduce_loss, weight_reduce_loss, weighted_loss
-from .consistency_loss import TempConsistencyLoss, TempConsistencyLoss1, TempConsistencyLoss2, TempConsistencyLoss3
+from .consistency_loss import TempConsistencyLoss, TempConsistencyLoss1, \
+        TempConsistencyLoss2, TempConsistencyLoss3, TempConsistencyLoss4
 
 __all__ = [
     'accuracy', 'Accuracy', 'cross_entropy', 'binary_cross_entropy',
@@ -17,5 +18,5 @@ __all__ = [
     'weight_reduce_loss', 'weighted_loss', 'LovaszLoss', 'DiceLoss',
     'FocalLoss', 'TverskyLoss', 'OhemCrossEntropy', 'BoundaryLoss',
     'TempConsistencyLoss','TempConsistencyLoss1','TempConsistencyLoss2',
-    'TempConsistencyLoss3'
+    'TempConsistencyLoss3', 'TempConsistencyLoss4'
 ]
