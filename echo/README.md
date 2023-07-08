@@ -88,7 +88,7 @@ python echo/tools/preprocess_echonet.py -i /data/dengxiaolong/EchoNet-Dynamic/ -
 #### preprocess camus
 ```bash
 # split from json file
-python echo/tools/preprocess_camus.py -i /data/dengxiaolong/camus/training -o /data/dengxiaolong/mmseg/camus -f echo/tools/train_val_test.json
+python echo/tools/preprocess_camus.py -i /data/dengxiaolong/camus/training -o /data/dengxiaolong/mmseg/camus -f echo/tools/train_val_test_ljy.json
 # random split 
 python echo/tools/preprocess_camus.py -i /data/dengxiaolong/camus/training -o /data/dengxiaolong/mmseg/camus_random
 ```

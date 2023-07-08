@@ -8,14 +8,14 @@ import numpy as np
 import configparser
 import random
 
-SEED = 1234
+SEED = 42
 RESIZE_SIZE = (320,320)
 SPLIT_RATIOS = [0.7,0.1,0.2]
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input_dir', type=str, default='/data/dengxiaolong/camus/training')
-    parser.add_argument('-o', '--output_dir', type=str, default='/data/dengxiaolong/mmseg/camus')
+    parser.add_argument('-o', '--output_dir', type=str, default='/data/dengxiaolong/mmseg/camus_random42')
     parser.add_argument('-f', '--split_file', type=str)
     args = parser.parse_args()
 
@@ -51,6 +51,14 @@ def split(data:list, ratios:list):
         splits.append(data[start:start+point])
         start += point
     return splits
+
+def filter(x):
+    # remove error value
+    x = np.where(x != 0, 255, 0).astype(np.uint8)
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(x, connectivity=8)
+    max_area_label = np.argmax(stats[1:, cv2.CC_STAT_AREA]) + 1
+    x = np.where(labels == max_area_label, 1, 0).astype(np.uint8)
+    return x
 
 def preprocess_data(input_path, output_path, split_file):
     # hyperparam
@@ -111,11 +119,13 @@ def preprocess_data(input_path, output_path, split_file):
         ed_np = sitk.GetArrayFromImage(ed)
         resize_ed = cv2.resize(ed_np[0], resize_size)
         resize_ed[resize_ed != 1] = 0
+        resize_ed = filter(resize_ed)
 
         es = sitk.ReadImage(os.path.join(video_path , video_name + '_ES_gt.mhd'))
         es_np = sitk.GetArrayFromImage(es)
         resize_es = cv2.resize(es_np[0], resize_size)
         resize_es[resize_es != 1] = 0
+        resize_es = filter(resize_es)
 
         frame_pairs_mask = {
             str(int(cfg['ED']) -1): resize_ed,
