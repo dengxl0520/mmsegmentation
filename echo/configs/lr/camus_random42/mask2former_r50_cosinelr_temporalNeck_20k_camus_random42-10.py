@@ -246,13 +246,16 @@ optim_wrapper = dict(
         norm_decay_mult=0.0))
 # learning policy
 param_scheduler = [
-    dict(
-        type='PolyLR',
-        eta_min=0,
-        power=0.9,
-        begin=0,
-        end=20000,
-        by_epoch=False)
+    dict(type='LinearLR',
+         start_factor=0.001,
+         by_epoch=False,
+         begin=0,
+         end=2000),
+    dict(type='CosineAnnealingLR',
+         T_max=18000,
+         by_epoch=False,
+         begin=2000,
+         end=20000,)
 ]
 
 # training schedule for 90k
