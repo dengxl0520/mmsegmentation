@@ -11,6 +11,7 @@ from .tpag import TPag
 from .tbgm import TemporalBoundaryGuidedMoudle
 from .temporal_neck_module import TemporalNeck
 from .temporal_attention_module import TemporalNeckSimple
+from .st_attention import STAttention
 
 __all__ = [
     'FPN', 'MultiLevelNeck', 'MLANeck', 'ICNeck', 'JPU', 'Feature2Pyramid'

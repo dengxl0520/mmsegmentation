@@ -17,6 +17,7 @@ from mmseg.registry import MODELS
 from .temporal_neck.pos_embeddings import PositionEmbeddingSine, PositionEmbeddingSine3D
 from .temporal_neck.temporal_attention import TemporalAttentionLayer, get_patch_mask_indices
 from .temporal_neck.temporal_neck_ops.modules import MSDeformAttn
+from .gate_propagation import GatedPropagation
 
 
 def _get_clones(module, N):
@@ -32,6 +33,74 @@ def _get_activation_fn(activation):
     if activation == "glu":
         return F.glu
     raise RuntimeError(f"activation should be relu/gelu, not {activation}.")
+
+
+# aggregation
+class STAggregation(nn.Module):
+    def __init__(self,
+                d_model=256,
+                d_ffn=512,
+                dropout=0.0,
+                activation='relu',
+                nhead=1) -> None:
+        super().__init__()
+
+        self.d_model = d_model
+        self.nhead = nhead
+        self.d_ffn = d_ffn
+
+        self.norm = nn.LayerNorm(d_model)
+        self.self_attn = nn.MultiheadAttention(embed_dim=d_model, num_heads=nhead, batch_first=True)
+
+        # ffn
+        self.linear1 = nn.Linear(d_model, d_model // 2)
+        self.activation = _get_activation_fn(activation)
+        self.dropout2 = nn.Dropout(dropout)
+        self.linear2 = nn.Linear(d_model // 2, d_model // 2)
+        self.dropout3 = nn.Dropout(dropout)
+        self.norm2 = nn.LayerNorm(d_model//2)
+
+        
+        # gpm
+        self.gpm = GatedPropagation(
+                d_qk=d_model, 
+                d_vu=d_model*2,
+                num_head=1,
+                use_linear=True,
+                dropout=0.0,
+                d_att=d_model,
+                top_k=-1,
+                expand_ratio=2.0)
+
+        self._reset_parameters()
+        
+    def _reset_parameters(self):
+        self._reset_linear(self.linear1)
+        self._reset_linear(self.linear2)
+
+    def _reset_linear(self, linear):
+        xavier_uniform_(linear.weight.data)
+        constant_(linear.bias.data, 0.)
+
+    def _forward_ffn(self, x):
+        x = self.linear1(x)
+        x1 = self.linear2(self.dropout2(self.activation(x)))
+        x = x + self.dropout3(x1)
+        x = self.norm2(x)
+        return x
+
+    def forward(self, s_feat, t_feat):
+        x = torch.cat((s_feat, t_feat), dim=-1)
+
+        # self.attn
+        # x, _ = self.self_attn(query=x, key=x, value=x)
+        # x = self._forward_ffn(x)
+
+        # x = self.linear1(x)
+        # x = self.norm2(x)
+        x,_ = self.gpm(x,x,x,x, None)
+
+        return x
 
 
 # MSDeformAttn Transformer encoder in deformable detr
@@ -57,8 +126,15 @@ class MSDeformAttnTransformerEncoderOnly(nn.Module):
             d_model=d_model, d_ffn=dim_feedforward, dropout=dropout, activation=activation, n_heads=nhead
         )
 
+        aggregation_layer = STAggregation(
+            d_model=d_model*2, nhead=1
+        )
+
         self.encoder = MSDeformAttnTransformerEncoder(
-            encoder_layer=encoder_layer, temporal_layer=temporal_layer, num_layers=num_encoder_layers
+            encoder_layer=encoder_layer, 
+            temporal_layer=temporal_layer, 
+            aggregation_layer=aggregation_layer,
+            num_layers=num_encoder_layers
         )
 
         self.level_embed = nn.Parameter(torch.Tensor(num_feature_levels, d_model))
@@ -187,10 +263,11 @@ class MSDeformAttnTransformerEncoderLayer(nn.Module):
 
 
 class MSDeformAttnTransformerEncoder(nn.Module):
-    def __init__(self, encoder_layer, temporal_layer, num_layers):
+    def __init__(self, encoder_layer, temporal_layer, aggregation_layer, num_layers):
         super().__init__()
-        self.layers = _get_clones(encoder_layer, num_layers)
+        self.spatial_layers = _get_clones(encoder_layer, num_layers)
         self.temporal_layers = _get_clones(temporal_layer, num_layers)
+        self.aggregation_layers = _get_clones(aggregation_layer, num_layers)
         self.num_layers = num_layers
 
     @staticmethod
@@ -216,16 +293,18 @@ class MSDeformAttnTransformerEncoder(nn.Module):
         output = src
         reference_points = self.get_reference_points(spatial_shapes, valid_ratios, device=src.device)
 
-        for _, (layer, layer_temporal) in enumerate(zip(self.layers, self.temporal_layers)):
-            output_1 = layer(output, pos, reference_points, spatial_shapes, level_start_index, padding_mask)
+        for _, (layer_spatial, layer_temporal, layer_aggregation) in enumerate(zip(self.spatial_layers, self.temporal_layers, self.aggregation_layers)):
+            output_1 = layer_spatial(output, pos, reference_points, spatial_shapes, level_start_index, padding_mask)
             output_2 = layer_temporal(src=output, pos=pos_3d, patch_mask_indices=patch_mask_indices)
-            output = output_1 + output_2
+            output = layer_aggregation(output_1, output_2)
+
+            # print(f"Sanity test: {torch.all(output == output_1)}")
 
         return output
 
 @MODELS.register_module()
 # @GlobalRegistry.register("PixelDecoder", "m2f_timesformer")
-class TemporalNeckSimple(nn.Module):
+class STAttention(nn.Module):
     # @configurable
     def __init__(
             self,
@@ -385,7 +464,6 @@ class TemporalNeckSimple(nn.Module):
             batch_sz, clip_len = x.shape[:2]
             x = rearrange(x, "B T C H W -> (B T) C H W")
             pos.append(self.pe_layer(x))
-            # pos.append(rearrange(pos_3d[-1], "B T C H W -> (B T) C H W"))
 
             x = self.input_proj[idx](x)
             srcs.append(rearrange(x, "(B T) C H W -> B T C H W", B=batch_sz, T=clip_len))
