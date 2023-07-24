@@ -7,8 +7,7 @@ from typing import List, Optional
 
 from torch import Tensor
 
-from mmengine.structures import PixelData
-from mmseg.structures import SegDataSample
+from mmengine.visualization import Visualizer
 from mmseg.registry import MODELS
 from mmseg.utils import (ConfigType, OptConfigType, OptMultiConfig,
                          OptSampleList, SampleList, add_prefix)
@@ -96,6 +95,20 @@ class SemiVideoEncoderDecoder(EncoderDecoder):
         seg_logits = self.decode_head.predict(x, batch_img_metas,
                                               self.test_cfg)
 
+        # visualizer = Visualizer.get_current_instance()
+        # for level, feats in enumerate(x):
+        #     for idx, feat in enumerate(x[level]):
+        #         ori_img = data_samples[idx].get('ori_img').data.transpose(1,2,0)
+        #         size = data_samples[idx].get('img_shape')
+        #         # feat = 1 - feat 
+        #         drawn_img = visualizer.draw_featmap(feat.sigmoid(), ori_img, channel_reduction='select_max', resize_shape=size)
+        #         visualizer.add_image('feat'+ str(level) + str(idx) + 'frame' , drawn_img)
+        # draw seg_logits
+        # for idx, seg_logits_frame in enumerate(seg_logits):
+        #     ori_img = data_samples[idx].get('ori_img').data.transpose(1,2,0)
+        #     size = data_samples[idx].get('img_shape')
+        #     seg_logit_img = visualizer.draw_featmap(seg_logits_frame, ori_img, channel_reduction='select_max', resize_shape=size)
+        #     visualizer.add_image('seg_logits_' + str(idx) + 'frame', seg_logit_img) 
         return self.postprocess_result(seg_logits, data_samples)
     
     def _forward(self,

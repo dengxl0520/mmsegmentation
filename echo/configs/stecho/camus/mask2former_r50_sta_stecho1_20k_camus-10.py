@@ -84,7 +84,8 @@ data_preprocessor = dict(
     pad_val=0,
     seg_pad_val=255,
     size=(320, 320))
-num_classes = 2
+num_classes = 1
+class_weight = [1.0, 1.0]
 model = dict(
     type='SemiVideoEncoderDecoder',
     data_preprocessor=data_preprocessor,
@@ -99,36 +100,34 @@ model = dict(
         style='pytorch',
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     neck=dict(
-        type='TemporalNeckSimple',
-        input_shape={
-            'res2':{
-                "channels":256,
-                "stride":4
-            },
-            'res3':{
-                "channels":512,
-                "stride":8
-            },
-            'res4':{
-                "channels":1024,
-                "stride":16
-            },
-            'res5':{
-                "channels":2048,
-                "stride":32
-            },
-        },
+        type='STAttention',
+        input_shape=dict(
+            res2=dict(channels=256, stride=4),
+            res3=dict(channels=512, stride=8),
+            res4=dict(channels=1024, stride=16),
+            res5=dict(channels=2048, stride=32)),
+        transformer_dropout=0.0,
+        transformer_nheads=8,
+        transformer_dim_feedforward=1024,
+        transformer_enc_layers=6,
+        conv_dim=256,
+        mask_dim=256,
+        norm='GN',
+        transformer_in_features=['res3', 'res4', 'res5'],
+        common_stride=4,
+        temporal_attn_ksize_offset=1,
     ),
     decode_head=dict(
-        type='Mask2FormerHead',
+        type='STEchoHead1',
         in_channels=[256, 256, 256, 256],
         strides=[4, 8, 16, 32],
         feat_channels=256,
         out_channels=256,
         num_classes=num_classes,
-        num_queries=100,
+        num_queries=1,
         num_transformer_feat_level=3,
         align_corners=False,
+        threshold=0.5,
         pixel_decoder=dict(
             type='mmdet.MSDeformAttnPixelDecoder',
             num_outs=3,
@@ -187,25 +186,19 @@ model = dict(
                     dropout_layer=None,
                     add_identity=True)),
             init_cfg=None),
-        loss_cls=dict(
-            type='mmdet.CrossEntropyLoss',
-            use_sigmoid=False,
-            loss_weight=2.0,
-            reduction='mean',
-            class_weight=[0.01,1.0,0.1]),
-        loss_mask=dict(
-            type='mmdet.CrossEntropyLoss',
-            use_sigmoid=True,
-            reduction='mean',
-            loss_weight=5.0),
-        loss_dice=dict(
-            type='mmdet.DiceLoss',
-            use_sigmoid=True,
-            activate=True,
-            reduction='mean',
-            naive_dice=True,
-            eps=1.0,
-            loss_weight=5.0),
+        loss_decode=[
+            dict(
+                type='CrossEntropyLoss', 
+                loss_name='loss_ce', 
+                use_sigmoid=True,
+                reduction='mean',
+                loss_weight=1.0),
+            dict(
+                type='BinaryDiceLoss', 
+                loss_name='loss_dice', 
+                eps=1.0,
+                loss_weight=1.0)
+        ],
         train_cfg=dict(
             num_points=12544,
             oversample_ratio=3.0,

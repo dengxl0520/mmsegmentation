@@ -23,8 +23,8 @@ randomness = dict(seed=1234)
 cfg=dict(compile=True)
 
 # dataset settings
-dataset_type = 'CAMUSVideoDataset'
-data_root = 'data/camus_random42'
+dataset_type = 'EchonetVideoDataset'
+data_root = 'data/echonet/echocycle'
 # pipeline
 train_pipeline = [
     dict(type='LoadNpyFile', frame_length=10, label_idxs=[0,9]),
@@ -38,7 +38,7 @@ test_pipeline = [
 ]
 # dataloader
 train_dataloader = dict(
-    batch_size=2,
+    batch_size=8,
     num_workers=8,
     persistent_workers=True,
     sampler=dict(type='InfiniteSampler', shuffle=True),
@@ -49,7 +49,7 @@ train_dataloader = dict(
             img_path='videos/train', seg_map_path='annotations/train'),
         pipeline=train_pipeline))
 val_dataloader = dict(
-    batch_size=1,
+    batch_size=8,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=False),
@@ -83,7 +83,7 @@ data_preprocessor = dict(
     bgr_to_rgb=True,
     pad_val=0,
     seg_pad_val=255,
-    size=(320, 320))
+    size=(128, 128))
 num_classes = 2
 model = dict(
     type='SemiVideoEncoderDecoder',
@@ -99,7 +99,7 @@ model = dict(
         style='pytorch',
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     neck=dict(
-        type='TemporalNeckSimple',
+        type='TemporalNeck',
         input_shape={
             'res2':{
                 "channels":256,
@@ -118,113 +118,24 @@ model = dict(
                 "stride":32
             },
         },
-    ),
+    ),    
     decode_head=dict(
-        type='Mask2FormerHead',
-        in_channels=[256, 256, 256, 256],
-        strides=[4, 8, 16, 32],
-        feat_channels=256,
-        out_channels=256,
+        type='ASPPHead',
+        in_channels=256,
+        channels=512,
         num_classes=num_classes,
-        num_queries=100,
-        num_transformer_feat_level=3,
+        dilations=(1, 12, 24, 36),
+        dropout_ratio=0.1,
+        norm_cfg=dict(type='SyncBN', requires_grad=False),
         align_corners=False,
-        pixel_decoder=dict(
-            type='mmdet.MSDeformAttnPixelDecoder',
-            num_outs=3,
-            norm_cfg=dict(type='GN', num_groups=32),
-            act_cfg=dict(type='ReLU'),
-            encoder=dict(  # DeformableDetrTransformerEncoder
-                num_layers=6,
-                layer_cfg=dict(  # DeformableDetrTransformerEncoderLayer
-                    self_attn_cfg=dict(  # MultiScaleDeformableAttention
-                        embed_dims=256,
-                        num_heads=8,
-                        num_levels=3,
-                        num_points=4,
-                        im2col_step=64,
-                        dropout=0.0,
-                        batch_first=True,
-                        norm_cfg=None,
-                        init_cfg=None),
-                    ffn_cfg=dict(
-                        embed_dims=256,
-                        feedforward_channels=1024,
-                        num_fcs=2,
-                        ffn_drop=0.0,
-                        act_cfg=dict(type='ReLU', inplace=True))),
-                init_cfg=None),
-            positional_encoding=dict(  # SinePositionalEncoding
-                num_feats=128, normalize=True),
-            init_cfg=None),
-        enforce_decoder_input_project=False,
-        positional_encoding=dict(  # SinePositionalEncoding
-            num_feats=128, normalize=True),
-        transformer_decoder=dict(  # Mask2FormerTransformerDecoder
-            return_intermediate=True,
-            num_layers=9,
-            layer_cfg=dict(  # Mask2FormerTransformerDecoderLayer
-                self_attn_cfg=dict(  # MultiheadAttention
-                    embed_dims=256,
-                    num_heads=8,
-                    attn_drop=0.0,
-                    proj_drop=0.0,
-                    dropout_layer=None,
-                    batch_first=True),
-                cross_attn_cfg=dict(  # MultiheadAttention
-                    embed_dims=256,
-                    num_heads=8,
-                    attn_drop=0.0,
-                    proj_drop=0.0,
-                    dropout_layer=None,
-                    batch_first=True),
-                ffn_cfg=dict(
-                    embed_dims=256,
-                    feedforward_channels=2048,
-                    num_fcs=2,
-                    act_cfg=dict(type='ReLU', inplace=True),
-                    ffn_drop=0.0,
-                    dropout_layer=None,
-                    add_identity=True)),
-            init_cfg=None),
-        loss_cls=dict(
-            type='mmdet.CrossEntropyLoss',
-            use_sigmoid=False,
-            loss_weight=2.0,
-            reduction='mean',
-            class_weight=[0.01,1.0,0.1]),
-        loss_mask=dict(
-            type='mmdet.CrossEntropyLoss',
-            use_sigmoid=True,
-            reduction='mean',
-            loss_weight=5.0),
-        loss_dice=dict(
-            type='mmdet.DiceLoss',
-            use_sigmoid=True,
-            activate=True,
-            reduction='mean',
-            naive_dice=True,
-            eps=1.0,
-            loss_weight=5.0),
-        train_cfg=dict(
-            num_points=12544,
-            oversample_ratio=3.0,
-            importance_sample_ratio=0.75,
-            assigner=dict(
-                type='mmdet.HungarianAssigner',
-                match_costs=[
-                    dict(type='mmdet.ClassificationCost', weight=2.0),
-                    dict(
-                        type='mmdet.CrossEntropyLossCost',
-                        weight=5.0,
-                        use_sigmoid=True),
-                    dict(
-                        type='mmdet.DiceCost',
-                        weight=5.0,
-                        pred_act=True,
-                        eps=1.0)
-                ]),
-            sampler=dict(type='mmdet.MaskPseudoSampler'))),
+        loss_decode=[
+            dict(type='DiceLoss', loss_weight=5.0),
+            dict(
+                type='CrossEntropyLoss',
+                use_sigmoid=False,
+                class_weight=[1, 1],
+                loss_weight=5.0),
+        ]),
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
 

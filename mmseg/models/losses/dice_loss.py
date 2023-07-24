@@ -135,3 +135,30 @@ class DiceLoss(nn.Module):
             str: The name of this loss item.
         """
         return self._loss_name
+
+@MODELS.register_module()
+class BinaryDiceLoss(DiceLoss):
+    def forward(self,
+                pred,
+                target,
+                avg_factor=None,
+                reduction_override=None,
+                **kwards):
+        assert reduction_override in (None, 'none', 'mean', 'sum')
+        reduction = (
+            reduction_override if reduction_override else self.reduction)
+
+        valid_mask = (target != self.ignore_index).long()
+
+        loss = self.loss_weight * binary_dice_loss(
+            pred,
+            target,
+            valid_mask=valid_mask,
+            reduction=reduction,
+            avg_factor=avg_factor,
+            smooth=self.smooth,
+            exponent=self.exponent,
+            ignore_index=self.ignore_index)
+
+        return loss
+

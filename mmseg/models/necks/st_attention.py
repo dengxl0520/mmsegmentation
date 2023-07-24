@@ -98,7 +98,9 @@ class STAggregation(nn.Module):
 
         # x = self.linear1(x)
         # x = self.norm2(x)
-        x,_ = self.gpm(x,x,x,x, None)
+        x = x.permute(1,0,2)
+        x,_ = self.gpm(x,x,x,x)
+        x = x.permute(1,0,2)
 
         return x
 
@@ -126,14 +128,9 @@ class MSDeformAttnTransformerEncoderOnly(nn.Module):
             d_model=d_model, d_ffn=dim_feedforward, dropout=dropout, activation=activation, n_heads=nhead
         )
 
-        aggregation_layer = STAggregation(
-            d_model=d_model*2, nhead=1
-        )
-
         self.encoder = MSDeformAttnTransformerEncoder(
             encoder_layer=encoder_layer, 
             temporal_layer=temporal_layer, 
-            aggregation_layer=aggregation_layer,
             num_layers=num_encoder_layers
         )
 
@@ -263,11 +260,10 @@ class MSDeformAttnTransformerEncoderLayer(nn.Module):
 
 
 class MSDeformAttnTransformerEncoder(nn.Module):
-    def __init__(self, encoder_layer, temporal_layer, aggregation_layer, num_layers):
+    def __init__(self, encoder_layer, temporal_layer, num_layers):
         super().__init__()
         self.spatial_layers = _get_clones(encoder_layer, num_layers)
         self.temporal_layers = _get_clones(temporal_layer, num_layers)
-        self.aggregation_layers = _get_clones(aggregation_layer, num_layers)
         self.num_layers = num_layers
 
     @staticmethod
@@ -291,13 +287,14 @@ class MSDeformAttnTransformerEncoder(nn.Module):
                 pos_3d, patch_mask_indices):
 
         output = src
+        output_new = src.clone()
         reference_points = self.get_reference_points(spatial_shapes, valid_ratios, device=src.device)
 
-        for _, (layer_spatial, layer_temporal, layer_aggregation) in enumerate(zip(self.spatial_layers, self.temporal_layers, self.aggregation_layers)):
-            output_1 = layer_spatial(output, pos, reference_points, spatial_shapes, level_start_index, padding_mask)
-            output_2 = layer_temporal(src=output, pos=pos_3d, patch_mask_indices=patch_mask_indices)
-            output = layer_aggregation(output_1, output_2)
-
+        for _, (layer_spatial, layer_temporal) in enumerate(zip(self.spatial_layers, self.temporal_layers)):
+            output = layer_spatial(output, pos, reference_points, spatial_shapes, level_start_index, padding_mask)
+            output = layer_temporal(src=output, pos=pos_3d, patch_mask_indices=patch_mask_indices) + output_new
+            output_new = output
+            
             # print(f"Sanity test: {torch.all(output == output_1)}")
 
         return output
@@ -319,7 +316,6 @@ class STAttention(nn.Module):
             # deformable transformer encoder args
             transformer_in_features: List[str] = ['res3', 'res4', 'res5'],
             common_stride: int = 4,
-            temporal_attn_patches_per_dim: int = 8,
             temporal_attn_ksize_offset: int = 1
     ):
         """

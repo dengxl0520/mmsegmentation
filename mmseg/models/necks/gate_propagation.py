@@ -86,7 +86,7 @@ class GatedPropagation(nn.Module):
 
         self._init_weight()
 
-    def forward(self, Q, K, V, U, size_2d):
+    def forward(self, Q, K, V, U):
         """
         :param Q: A 3d tensor with shape of [T_q, bs, C_q]
         :param K: A 3d tensor with shape of [T_k, bs, C_k]

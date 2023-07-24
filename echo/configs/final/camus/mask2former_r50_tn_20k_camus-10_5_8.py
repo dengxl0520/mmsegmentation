@@ -99,7 +99,7 @@ model = dict(
         style='pytorch',
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     neck=dict(
-        type='TemporalNeckSimple',
+        type='TemporalNeck',
         input_shape={
             'res2':{
                 "channels":256,
@@ -135,7 +135,7 @@ model = dict(
             norm_cfg=dict(type='GN', num_groups=32),
             act_cfg=dict(type='ReLU'),
             encoder=dict(  # DeformableDetrTransformerEncoder
-                num_layers=6,
+                num_layers=5,
                 layer_cfg=dict(  # DeformableDetrTransformerEncoderLayer
                     self_attn_cfg=dict(  # MultiScaleDeformableAttention
                         embed_dims=256,

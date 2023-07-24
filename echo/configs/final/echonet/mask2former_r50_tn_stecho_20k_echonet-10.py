@@ -23,8 +23,8 @@ randomness = dict(seed=1234)
 cfg=dict(compile=True)
 
 # dataset settings
-dataset_type = 'CAMUSVideoDataset'
-data_root = 'data/camus_random42'
+dataset_type = 'EchonetVideoDataset'
+data_root = 'data/echonet/echocycle'
 # pipeline
 train_pipeline = [
     dict(type='LoadNpyFile', frame_length=10, label_idxs=[0,9]),
@@ -38,7 +38,7 @@ test_pipeline = [
 ]
 # dataloader
 train_dataloader = dict(
-    batch_size=2,
+    batch_size=8,
     num_workers=8,
     persistent_workers=True,
     sampler=dict(type='InfiniteSampler', shuffle=True),
@@ -49,7 +49,7 @@ train_dataloader = dict(
             img_path='videos/train', seg_map_path='annotations/train'),
         pipeline=train_pipeline))
 val_dataloader = dict(
-    batch_size=1,
+    batch_size=8,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=False),
@@ -83,7 +83,7 @@ data_preprocessor = dict(
     bgr_to_rgb=True,
     pad_val=0,
     seg_pad_val=255,
-    size=(320, 320))
+    size=(128, 128))
 num_classes = 2
 model = dict(
     type='SemiVideoEncoderDecoder',
@@ -120,13 +120,13 @@ model = dict(
         },
     ),
     decode_head=dict(
-        type='Mask2FormerHead',
+        type='STEchoHead',
         in_channels=[256, 256, 256, 256],
         strides=[4, 8, 16, 32],
         feat_channels=256,
         out_channels=256,
         num_classes=num_classes,
-        num_queries=100,
+        num_queries=2,
         num_transformer_feat_level=3,
         align_corners=False,
         pixel_decoder=dict(
@@ -192,7 +192,7 @@ model = dict(
             use_sigmoid=False,
             loss_weight=2.0,
             reduction='mean',
-            class_weight=[0.01,1.0,0.1]),
+            class_weight=[0.01, 1.0, 0.1]),
         loss_mask=dict(
             type='mmdet.CrossEntropyLoss',
             use_sigmoid=True,

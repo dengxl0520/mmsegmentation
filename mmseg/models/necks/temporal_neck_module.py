@@ -240,7 +240,6 @@ class TemporalNeck(nn.Module):
             # deformable transformer encoder args
             transformer_in_features: List[str] = ['res3', 'res4', 'res5'],
             common_stride: int = 4,
-            temporal_attn_patches_per_dim: int = 8,
             temporal_attn_ksize_offset: int = 1
     ):
         """
