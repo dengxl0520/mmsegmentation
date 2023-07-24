@@ -35,7 +35,7 @@ from .uper_head import UPerHead
 from .pid_headv2 import PIDHeadV2
 from .pid_head_semi import PIDHeadSemi
 from .pid_head_semi_hl import PIDHeadSemiHL
-from .stecho_head import STEchoHead, STEchoHead1
+from .stecho_head import STEchoHead
 
 __all__ = [
     'FCNHead', 'PSPHead', 'ASPPHead', 'PSAHead', 'NLHead', 'GCHead', 'CCHead',
@@ -45,5 +45,5 @@ __all__ = [
     'SETRMLAHead', 'DPTHead', 'SETRMLAHead', 'SegmenterMaskTransformerHead',
     'SegformerHead', 'ISAHead', 'STDCHead', 'IterativeDecodeHead',
     'KernelUpdateHead', 'KernelUpdator', 'MaskFormerHead', 'Mask2FormerHead',
-    'LightHamHead', 'PIDHead', 'STEchoHead', 'STEchoHead1'
+    'LightHamHead', 'PIDHead', 'STEchoHead'
 ]

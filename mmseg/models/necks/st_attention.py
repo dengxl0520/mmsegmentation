@@ -1,13 +1,12 @@
 import numpy as np
-from einops import rearrange, repeat
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from einops import rearrange
+from typing import Callable, Dict, List, Optional, Union
 
 import copy
-import fvcore.nn.weight_init as weight_init
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.nn.init import xavier_uniform_, constant_, uniform_, normal_
+from torch.nn.init import xavier_uniform_, constant_, normal_
 from torch.cuda.amp import autocast
 
 from mmcv.cnn import ConvModule

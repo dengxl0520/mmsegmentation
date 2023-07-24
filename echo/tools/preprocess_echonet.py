@@ -124,15 +124,16 @@ def preprocess_data(input_path, output_path, save_kpts, save_masks, save_imgs):
         edv = data[data['FileName'] == name]['EDV'].item()
         patient_df = echonet_pts[echonet_pts.FileName == fname]
         video_path = os.path.join(input_path, "Videos", fname)
-        video = loadvideo(video_path).astype(np.uint8)
-        print(nnum, fname)
-        nnum += 1
 
         # check whether file exists
         if not os.path.exists(video_path):
             print('Not found: ', video_path)
             output_list_invalid.append("{0}".format(name))
             continue
+
+        video = loadvideo(video_path).astype(np.uint8)
+        print(nnum, fname)
+        nnum += 1
 
         pts_pairs = []
         frame_pairs = {}
@@ -157,11 +158,6 @@ def preprocess_data(input_path, output_path, save_kpts, save_masks, save_imgs):
             y = np.concatenate((y1[:], np.flip(y2[:])))
             pts = np.array([x, y]).transpose()
             num_pts = str(len(pts))
-
-            # only use if you want to downsample the points instead of using the 40 gt points
-            # lvc = LeftVentricleUnorderedContour(mask=mask)
-            # oc = lvc.to_ordered_contour(num_pts=40)["myo"]
-            # oc = np.asarray(oc).swapaxes(0,1)
 
             if name in x_test:
                 output_list_test.append(str("{0}_{1}.png".format(name, frame)))

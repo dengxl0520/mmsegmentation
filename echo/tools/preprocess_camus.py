@@ -1,11 +1,9 @@
 import argparse
 import os
-import sys
 import json
 import SimpleITK as sitk
 import cv2
 import numpy as np
-import configparser
 import random
 
 SEED = 42

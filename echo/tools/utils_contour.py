@@ -67,7 +67,6 @@ def echonet_trace_to_mask(t, mask_size: tuple):
     mask[r, c] = 1
     return mask
 
-
 class GradientCurvature:
 
     def __init__(self, trace, plot_derivatives=False):
@@ -100,7 +99,6 @@ class GradientCurvature:
             y_prime * x_bis / ((x_prime ** 2 + y_prime ** 2) ** (3/2))  # Numerical trick to get accurate values
         self.curvature = curvature
         return curvature
-
 
 class LeftVentricleUnorderedContour():
     """ class to handle an unordered LV contour. Can be initialized from a binary mask or a point set"""
