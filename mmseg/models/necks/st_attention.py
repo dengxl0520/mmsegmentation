@@ -110,7 +110,7 @@ class MSDeformAttnTransformerEncoderOnly(nn.Module):
                  num_encoder_layers=6, dim_feedforward=1024, dropout=0.1,
                  activation="relu",
                  num_feature_levels=4, enc_n_points=4,
-                 temporal_attn_ksize_offset=0):
+                 temporal_attn_ksize_offset=0,attention_type='STAttention'):
         super().__init__()
 
         self.d_model = d_model
@@ -127,11 +127,25 @@ class MSDeformAttnTransformerEncoderOnly(nn.Module):
             d_model=d_model, d_ffn=dim_feedforward, dropout=dropout, activation=activation, n_heads=nhead
         )
 
-        self.encoder = MSDeformAttnTransformerEncoder(
-            encoder_layer=encoder_layer, 
-            temporal_layer=temporal_layer, 
-            num_layers=num_encoder_layers
-        )
+        assert attention_type in ['STAttention', 'SAttention', 'TAttention']
+        if attention_type == 'STAttention':
+            self.encoder = MSDeformAttnTransformerEncoder(
+                encoder_layer=encoder_layer, 
+                temporal_layer=temporal_layer, 
+                num_layers=num_encoder_layers
+            )
+        elif attention_type == 'SAttention':
+            self.encoder = MSDeformAttnTransformerEncoderOnlySpatial(
+                encoder_layer=encoder_layer, 
+                temporal_layer=temporal_layer, 
+                num_layers=num_encoder_layers
+            )
+        elif attention_type == 'TAttention':
+            self.encoder = MSDeformAttnTransformerEncoderOnlyTemporal(
+                encoder_layer=encoder_layer, 
+                temporal_layer=temporal_layer, 
+                num_layers=num_encoder_layers
+            )
 
         self.level_embed = nn.Parameter(torch.Tensor(num_feature_levels, d_model))
         self.level_embed_3d = nn.Parameter(torch.Tensor(num_feature_levels, d_model))
@@ -257,7 +271,6 @@ class MSDeformAttnTransformerEncoderLayer(nn.Module):
 
         return src
 
-
 class MSDeformAttnTransformerEncoder(nn.Module):
     def __init__(self, encoder_layer, temporal_layer, num_layers):
         super().__init__()
@@ -298,6 +311,38 @@ class MSDeformAttnTransformerEncoder(nn.Module):
 
         return output
 
+class MSDeformAttnTransformerEncoderOnlySpatial(MSDeformAttnTransformerEncoder):
+    def forward(self, src, spatial_shapes, level_start_index, valid_ratios, pos, padding_mask,
+                pos_3d, patch_mask_indices):
+
+        output = src
+        output_new = src.clone()
+        reference_points = self.get_reference_points(spatial_shapes, valid_ratios, device=src.device)
+
+        for _, (layer_spatial, layer_temporal) in enumerate(zip(self.spatial_layers, self.temporal_layers)):
+            output = layer_spatial(output, pos, reference_points, spatial_shapes, level_start_index, padding_mask) + output_new
+            output_new = output
+            
+            # print(f"Sanity test: {torch.all(output == output_1)}")
+
+        return output
+    
+class MSDeformAttnTransformerEncoderOnlyTemporal(MSDeformAttnTransformerEncoder):
+    def forward(self, src, spatial_shapes, level_start_index, valid_ratios, pos, padding_mask,
+                pos_3d, patch_mask_indices):
+
+        output = src
+        output_new = src.clone()
+        reference_points = self.get_reference_points(spatial_shapes, valid_ratios, device=src.device)
+
+        for _, (layer_spatial, layer_temporal) in enumerate(zip(self.spatial_layers, self.temporal_layers)):
+            output = layer_temporal(src=output, pos=pos_3d, patch_mask_indices=patch_mask_indices) + output_new
+            output_new = output
+            
+            # print(f"Sanity test: {torch.all(output == output_1)}")
+
+        return output
+
 @MODELS.register_module()
 # @GlobalRegistry.register("PixelDecoder", "m2f_timesformer")
 class STAttention(nn.Module):
@@ -315,7 +360,8 @@ class STAttention(nn.Module):
             # deformable transformer encoder args
             transformer_in_features: List[str] = ['res3', 'res4', 'res5'],
             common_stride: int = 4,
-            temporal_attn_ksize_offset: int = 1
+            temporal_attn_ksize_offset: int = 1,
+            attention_type= 'STAttention'
     ):
         """
         NOTE: this interface is experimental.
@@ -375,7 +421,8 @@ class STAttention(nn.Module):
             dim_feedforward=transformer_dim_feedforward,
             num_encoder_layers=transformer_enc_layers,
             num_feature_levels=self.transformer_num_feature_levels,
-            temporal_attn_ksize_offset=temporal_attn_ksize_offset
+            temporal_attn_ksize_offset=temporal_attn_ksize_offset,
+            attention_type=attention_type,
         )
         N_steps = conv_dim // 2
         self.pe_layer = PositionEmbeddingSine(N_steps, normalize=True)
@@ -509,5 +556,3 @@ class STAttention(nn.Module):
         
         # print(multi_scale_features[-1].min(), multi_scale_features[-1].max())
         return multi_scale_features[::-1]
-
-

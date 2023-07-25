@@ -27,6 +27,7 @@ model = dict(
         transformer_in_features=['res3', 'res4', 'res5'],
         common_stride=4,
         temporal_attn_ksize_offset=1,
+        attention_type= 'STAttention',
     ),
     decode_head=dict(
         type='STEchoHead',
