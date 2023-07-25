@@ -47,6 +47,6 @@ test_dataloader = dict(
             img_path='videos/test', seg_map_path='annotations/test'),
         pipeline=test_pipeline))
 val_evaluator = dict(
-    type='IoUMetric', iou_metrics=['mIoU', 'mDice', 'mFscore'], prefix='val')
+    type='EchoMetric', iou_metrics=['mIoU', 'mDice', 'mFscore'], prefix='val')
 test_evaluator = dict(
-    type='IoUMetric', iou_metrics=['mIoU', 'mDice', 'mFscore'], prefix='test')
+    type='EchoMetric', iou_metrics=['mIoU', 'mDice', 'mFscore'], prefix='test')

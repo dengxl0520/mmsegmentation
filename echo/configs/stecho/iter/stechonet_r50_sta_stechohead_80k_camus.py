@@ -1,8 +1,8 @@
 _base_ = [
-    '../_base_/default_runtime.py',
-    '../_base_/models/stechonet_r50_sta_stechohead.py',
-    '../_base_/datasets/camus.py',
-    '../_base_/schedules/schedule_40k_cosinelr.py'
+    '../../_base_/default_runtime.py',
+    '../../_base_/models/stechonet_r50_sta_stechohead.py',
+    '../../_base_/datasets/camus.py',
+    '../../_base_/schedules/schedule_80k_cosinelr_sgd_1e-2.py'
 ]
 size=(320,320)
 data_preprocessor = dict(
