@@ -13,5 +13,7 @@ data_preprocessor = dict(
     pad_val=0,
     seg_pad_val=255,
     size=size)
-model = dict(data_preprocessor=data_preprocessor)
+model = dict(
+    data_preprocessor=data_preprocessor,
+    transformer_enc_layers=6)
 
