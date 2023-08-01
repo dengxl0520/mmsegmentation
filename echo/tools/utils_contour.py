@@ -3,6 +3,46 @@ import matplotlib.pyplot as plt
 from skimage import draw
 import numpy as np
 from scipy.interpolate import interp1d
+from torch import Tensor
+
+def find_contours(mask: Tensor):
+    h,w = mask.shape
+    if isinstance(mask, Tensor): 
+        mask = mask.numpy().astype(np.uint8)
+    edge = np.zeros((h,w), dtype=np.uint8)
+
+    contours, _ = cv2.findContours(mask, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_NONE)
+
+    assert len(contours) == 1
+    contours = contours[0].squeeze()
+    edge[contours[:,1], contours[:,0]] = 1
+
+    # check
+    assert edge.sum() == (edge*mask).sum()
+    return edge
+
+def find_contour_points(mask: Tensor):
+    '''
+        mask: (h,w), 0 or 1
+        return: contours (n,2)
+                the x,y of the points 
+    '''
+    h,w = mask.shape
+    mask = mask.numpy().astype(np.uint8)
+    edge = np.zeros((h,w), dtype=np.uint8)
+
+    contours, _ = cv2.findContours(mask, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_NONE)
+
+    # assert len(contours) == 1
+    if len(contours) != 1:
+        return np.array([])
+    
+    contours = contours[0].squeeze()
+    edge[contours[:,1], contours[:,0]] = 1
+
+    # check
+    assert edge.sum() == (edge*mask).sum()
+    return contours
 
 def interpolate_contour(contour, num_pts, start_pt=None, end_pt=None):
     """ interpolate a contour to the desired number of points """
