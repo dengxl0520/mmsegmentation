@@ -1,7 +1,9 @@
 from collections import OrderedDict
+import math
 from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
+import pandas as pd
 import torch
 from torch import Tensor
 import os.path as osp
@@ -9,13 +11,26 @@ import os.path as osp
 from PIL import Image
 
 from mmseg.registry import METRICS
+from mmengine.logging import MMLogger, print_log
 
 from .iou_metric import IoUMetric
 from scipy.spatial.distance import cdist
 from echo.tools.utils_contour import find_contour_points
 
+def draw_linear_regression_map(data, xname:str, yname:str, fig_name:str):
+    import seaborn as sns
+    sns.set_theme(style="darkgrid")
 
-def hausdorff_distance(mask1: Tensor, mask2: Tensor, percentile: int=95):
+    # tips = sns.load_dataset("tips")
+    g = sns.jointplot(x=xname, y=yname, data=data,
+                    kind="reg", truncate=False,
+                    xlim=(0, 100), ylim=(0, 100),
+                    color="m", height=7)
+    g.savefig(fig_name+'.png')
+    return g
+
+
+def hausdorff_distance(mask1: Tensor, mask2: Tensor, percentile: int = 95):
     # 获取目标集合和预测集合中的非零点的坐标
     mask1 = mask1.cpu()
     mask2 = mask2.cpu()
@@ -28,41 +43,100 @@ def hausdorff_distance(mask1: Tensor, mask2: Tensor, percentile: int=95):
     # 计算所有点对之间的欧氏距离
     dist = cdist(contours1, contours2)
     dist = np.concatenate((np.min(dist, axis=0), np.min(dist, axis=1)))
-    assert percentile >= 0 and percentile <=100, 'percentile invaild'
+    assert percentile >= 0 and percentile <= 100, 'percentile invaild'
     hausdorff_dist = np.percentile(dist, percentile)
 
     return hausdorff_dist
 
-def coor(x, y):
+def corr(x, y):
     '''
-    A = mean( (y_real - mean(y_real)) * (y_predict - mean(y_predict)) )
-    B = std(y_real) * std(y_predict)
+        x : gt
+        y : pred
+        A = mean( (y_real - mean(y_real)) * (y_predict - mean(y_predict)) )
+        B = std(y_real) * std(y_predict)
+        corr = A / B
+    '''
+    A = ((x - x.mean()) * (y - y.mean())).mean()
+    B = std(x) * std(y)
     corr = A / B
-    ''' 
+    return corr
 
 def bias(x, y):
     '''
-    bias = sum( y_real - y_predict ) / len( y_real )
+        x : gt
+        y : pred
+        bias = sum( y_real - y_predict ) / len( y_real )
     '''
+    return (x - y).mean()
 
+def std(x):
+    '''
+        A = (y - mean(y)) * (y - mean(y))
+        std = sqrt( sum(A) / n )
+    '''
+    # A = ((x - x.mean()) * (x - x.mean())).mean()
+    # std = np.sqrt(A)
+    return np.std(x)
 
-def std(x, y):
-    '''
-    A = (y - mean(y)) * (y - mean(y))
-    std = sqrt( sum(  ) / n )
-    '''
-    
-def LVEF(x, y):
-    a = abs(x-y)
-    b = max(x, y)
-    return a / b
-    
+def simpson(label, pred_label, gt_vol):
+    pred_vol = pred_label.sum() * gt_vol / label.sum()
+    return pred_vol
+
+def LVEF(vol_pred):
+    vol1, vol2 = vol_pred
+    a = abs(vol1 - vol2)
+    b = max(vol1, vol2)
+    # a = vol2 - vol1 
+    # b = vol2
+    return a / b *100
 
 @METRICS.register_module()
 class EchoMetric(IoUMetric):
+
+    def __init__(self,
+                 ignore_index: int = 255,
+                 iou_metrics: List[str] = ...,
+                 nan_to_num: Optional[int] = None,
+                 beta: int = 1,
+                 collect_device: str = 'cpu',
+                 output_dir: Optional[str] = None,
+                 format_only: bool = False,
+                 prefix: Optional[str] = None,
+                 **kwargs) -> None:
+        super().__init__(ignore_index, iou_metrics, nan_to_num, beta,
+                         collect_device, output_dir, format_only, prefix,
+                         **kwargs)
+        self.hd95 = []
+        self.lvef_gt = []
+        self.lvef_pred = []
+    
+    def compute_metrics(self, results: list) -> Dict[str, float]:
+        logger: MMLogger = MMLogger.get_current_instance()
+        if isinstance(self.lvef_gt[0], Tensor):
+            self.lvef_gt = torch.stack(self.lvef_gt).numpy()
+        if isinstance(self.lvef_pred[0], Tensor):
+            self.lvef_pred = torch.stack(self.lvef_pred).numpy()
+        self.corr = corr(self.lvef_gt, self.lvef_pred)
+        self.bias = bias(self.lvef_gt, self.lvef_pred)
+        self.std = std(self.lvef_pred-self.lvef_gt)
+        print_log('corr: ' + str((self.corr*100).round(2)), logger=logger)
+        print_log('bias: ' + str((self.bias).round(2)), logger=logger)
+        print_log('std : ' + str((self.std).round(2)), logger=logger)
+
+        dataframe1 = pd.DataFrame(self.lvef_gt,columns=['gt'])
+        dataframe2 = pd.DataFrame(self.lvef_pred,columns=['pred'])
+        df = pd.concat([dataframe1,dataframe2], axis=1)
+
+        draw_linear_regression_map(df, xname='gt', yname='pred',fig_name='1')
+        return super().compute_metrics(results)
+
     def process(self, data_batch: dict, data_samples: Sequence[dict]) -> None:
         num_classes = len(self.dataset_meta['classes'])
-        for data_sample in data_samples:
+        assert len(data_samples) == 2
+        esv, edv = data_samples[0]['esv'], data_samples[0]['edv']
+        vol_gt = [esv,edv]
+        vol_pred = []
+        for idx, data_sample in enumerate(data_samples):
             pred_label = data_sample['pred_sem_seg']['data'].squeeze()
             # format_only always for test dataset without ground truth
             if not self.format_only:
@@ -70,7 +144,11 @@ class EchoMetric(IoUMetric):
                     pred_label)
                 # compute hd95
                 hd95 = hausdorff_distance(pred_label, label, 95)
-                print(hd95)
+                self.hd95.append(hd95)
+                
+                # compute vol_pred
+                vol_pred.append(simpson(label,pred_label,vol_gt[idx]))
+
                 self.results.append(
                     self.intersect_and_union(pred_label, label, num_classes,
                                              self.ignore_index))
@@ -88,3 +166,7 @@ class EchoMetric(IoUMetric):
                     output_mask = output_mask + 1
                 output = Image.fromarray(output_mask.astype(np.uint8))
                 output.save(png_filename)
+
+        # lvef
+        self.lvef_gt.append(data_samples[0]['ef'])
+        self.lvef_pred.append(LVEF(vol_pred).cpu())

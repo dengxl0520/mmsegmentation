@@ -65,7 +65,7 @@ def load_video_and_mask_file(img_path: str,
     masks = np.asarray(masks)
     imgs = np.asarray(frames)
 
-    return imgs, masks, ef
+    return imgs, masks, ef, vol1, vol2
 
 
 @TRANSFORMS.register_module()
@@ -78,7 +78,7 @@ class LoadNpyFile(BaseTransform):
     def transform(self, results: Dict) -> Optional[Dict]:
         img_path = results['img_path']
         anno_path = results['seg_map_path']
-        imgs, masks, ef = load_video_and_mask_file(img_path, anno_path,
+        imgs, masks, ef, esv, edv= load_video_and_mask_file(img_path, anno_path,
                                                    self.frame_length)
 
         results['img'] = imgs
@@ -90,6 +90,8 @@ class LoadNpyFile(BaseTransform):
         results['imgs_shape'] = imgs.shape
         results['img_shape'] = imgs.shape[2:]
         results['ori_shape'] = imgs.shape[2:]
+        results['esv'] = esv
+        results['edv'] = edv
 
         return results
 
@@ -137,6 +139,8 @@ class PackSegMultiInputs(BaseTransform):
 
         if 'ef' in results:
             img_meta['ef'] = to_tensor(results['ef'].astype(np.float32))
+            img_meta['esv'] = to_tensor(results['esv'].astype(np.float32))
+            img_meta['edv'] = to_tensor(results['edv'].astype(np.float32))
 
         if 'label_idxs' in img_meta:
             for i in range(len(img_meta['label_idxs'])):
@@ -200,6 +204,8 @@ class TestPackSegMultiInputs(BaseTransform):
 
         if 'ef' in results:
             img_meta['ef'] = to_tensor(results['ef'].astype(np.float32))
+            img_meta['esv'] = to_tensor(results['esv'].astype(np.float32))
+            img_meta['edv'] = to_tensor(results['edv'].astype(np.float32))
 
         if 'label_idxs' in img_meta:
             for i, data_sample in enumerate(data_samples):
