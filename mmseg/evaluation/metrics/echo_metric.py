@@ -119,9 +119,11 @@ class EchoMetric(IoUMetric):
         self.corr = corr(self.lvef_gt, self.lvef_pred)
         self.bias = bias(self.lvef_gt, self.lvef_pred)
         self.std = std(self.lvef_pred-self.lvef_gt)
+        self.hd95 =np.mean(self.hd95)
         print_log('corr: ' + str((self.corr*100).round(2)), logger=logger)
         print_log('bias: ' + str((self.bias).round(2)), logger=logger)
         print_log('std : ' + str((self.std).round(2)), logger=logger)
+        print_log('HD95: ' + str((self.hd95).round(2)), logger=logger)
 
         dataframe1 = pd.DataFrame(self.lvef_gt,columns=['gt'])
         dataframe2 = pd.DataFrame(self.lvef_pred,columns=['pred'])

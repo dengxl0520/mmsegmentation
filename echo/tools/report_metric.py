@@ -33,11 +33,15 @@ def main():
 
     if args.dataset == 'test':
         for idx, data_batch in enumerate(runner.test_loop.dataloader):
+            batchsize = runner.test_loop.dataloader.batch_size
+            runner.model.batchsize = batchsize
             outputs = runner.model.test_step(data_batch)
             runner.test_loop.evaluator.process(
                 data_samples=outputs, data_batch=data_batch)
     elif args.dataset == 'val':
         for idx, data_batch in enumerate(runner.val_loop.dataloader):
+            batchsize = runner.val_loop.dataloader.batch_size
+            runner.model.batchsize = batchsize
             outputs = runner.model.test_step(data_batch)
             runner.test_loop.evaluator.process(
                 data_samples=outputs, data_batch=data_batch)
@@ -54,6 +58,18 @@ def main():
         # es
         print("ES frames results")
         metric.compute_metrics(metric.results[1::2])
+    
+    def draw_linear_regression_map(data, xname:str, yname:str):
+        import seaborn as sns
+        sns.set_theme(style="darkgrid")
+
+        # tips = sns.load_dataset("tips")
+        g = sns.jointplot(x=xname, y=yname, data=data,
+                        kind="reg", truncate=False,
+                        xlim=(0, 100), ylim=(0, 100),
+                        color="m", height=7)
+        g.savefig('1.png')
+        return g
 
 
 if __name__ == '__main__':
