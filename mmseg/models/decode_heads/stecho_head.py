@@ -209,7 +209,8 @@ class STEchoHead(nn.Module):
         batch_img_metas = [
             data_sample.metainfo for data_sample in batch_data_samples
         ]
-        batch_size = len(batch_img_metas)
+        # batch_size = len(batch_img_metas)
+        batch_size = x[0].shape[0]
         mask_features, multi_scale_memorys = self.pixel_decoder(x)
         # multi_scale_memorys (from low resolution to high resolution)
         decoder_inputs = []

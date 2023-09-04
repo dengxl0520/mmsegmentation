@@ -251,7 +251,7 @@ class SegVideoPreProcessor(SegDataPreProcessor):
                 for j in range(len(inputs)):
                     inputs_new.append(inputs[j][i])
             inputs = inputs_new
-        if isinstance(data_samples[0], tuple):
+        if not not(data_samples) and isinstance(data_samples[0], tuple):
             for i in range(len(data_samples[0])):
                 for j in range(len(data_samples)):
                     data_samples_new.append(data_samples[j][i])

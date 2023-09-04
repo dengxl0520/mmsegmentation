@@ -12,7 +12,7 @@ def parse_args():
         description='MMSeg test (and eval) a model')
     parser.add_argument('config', help='train config file path')
     parser.add_argument('checkpoint', help='checkpoint file')
-    parser.add_argument('--save_dir', default="./work_dirs/atest/", help='the path save visualization')
+    parser.add_argument('--save_dir', default="./work_dirs/add_echonet/", help='the path save visualization')
     args = parser.parse_args()
 
     return args
@@ -121,7 +121,29 @@ def draw_sem_seg_sum(seg_local_visualizer, image: np.ndarray, gt_sem_seg,
 
     return seg_local_visualizer.get_image()
 
-def draw_sem_seg(image, gt_sem_seg, pred_sem_seg, palette):
+def draw_sem_seg_by_cv2(image, pred_sem_seg, palette):
+    '''
+        image: [3,h,w]
+        pred_sem_seg: []
+        palette: [bg, pred]
+    '''
+    pred_sem_seg = pred_sem_seg.cpu().data.type(torch.int64)
+    mask = pred_sem_seg.squeeze()
+    
+    ids = np.unique(mask)
+    color_mask = np.zeros_like(image)
+    for idx in ids:
+        color_mask[0][mask == idx] = palette[idx][0]
+        color_mask[1][mask == idx] = palette[idx][1]
+        color_mask[2][mask == idx] = palette[idx][2]
+    
+    results = cv2.addWeighted(image, 0.2, color_mask, 0.8, 0)
+    mask = mask.unsqueeze(0).repeat(3,1,1)
+    image[mask != 0] = results[mask != 0]
+    return image
+
+
+def draw_sem_seg_by_cv2_sum(image, gt_sem_seg, pred_sem_seg, palette):
     '''
         image: [3,h,w]
         gt_sem_seg: []
@@ -200,23 +222,47 @@ def main():
             outputs = model.predict(inputs=data['inputs'], data_samples=data['data_samples'])
             # outputs = model.postprocess_result(seg_logits, data['data_samples'])
 
-            img_name = outputs[0].get('img_path').split('/')[-1].split(
-                '.')[0] + ".png"
-            pred_name = outputs[0].get('img_path').split('/')[-1].split(
-                '.')[0] + "_pred.png"
             for data_sample in outputs:
-                image = data_sample.get('ori_img').data
+                idx = '_' + str(data_sample.get('frame_idx')) + '_'
+                img_name = outputs[0].get('img_path').split('/')[-1].split(
+                    '.')[0] +idx+  ".png"
+                pred_name = outputs[0].get('img_path').split('/')[-1].split(
+                    '.')[0] +idx+ "pred.png"
 
+                image = data_sample.get('ori_img').data
+                # only output ed and es
+                # if 'gt_sem_seg' in data_sample:
+                #     # ori_img
+                #     mmcv.imwrite(mmcv.bgr2rgb(image.transpose(1, 2, 0)), save_dir + img_name)
+                #     # vis
+                #     results = draw_sem_seg_by_cv2_sum(
+                #             image,
+                #             data_sample.gt_sem_seg,
+                #             data_sample.pred_sem_seg,
+                #             palette)
+                #     mmcv.imwrite(mmcv.bgr2rgb(results.transpose(1, 2, 0)), save_dir + pred_name)
+                # output 10 frames
                 if 'gt_sem_seg' in data_sample:
                     # ori_img
                     mmcv.imwrite(mmcv.bgr2rgb(image.transpose(1, 2, 0)), save_dir + img_name)
                     # vis
-                    results = draw_sem_seg(
+                    results = draw_sem_seg_by_cv2_sum(
                             image,
                             data_sample.gt_sem_seg,
                             data_sample.pred_sem_seg,
                             palette)
                     mmcv.imwrite(mmcv.bgr2rgb(results.transpose(1, 2, 0)), save_dir + pred_name)
+                else: 
+                    # ori_img
+                    mmcv.imwrite(mmcv.bgr2rgb(image.transpose(1, 2, 0)), save_dir + img_name)
+                    # vis
+                    results = draw_sem_seg_by_cv2(
+                            image,
+                            data_sample.pred_sem_seg,
+                            [[255, 255, 255],[178, 48, 0]])
+                    mmcv.imwrite(mmcv.bgr2rgb(results.transpose(1, 2, 0)), save_dir + pred_name)
+
+
 
 if __name__ == '__main__':
     main()

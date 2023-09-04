@@ -9,8 +9,8 @@ from echo.tools.utils_contour import find_contours
 def parse_args():
     parser = argparse.ArgumentParser(
         description='draw contour in image')
-    parser.add_argument('--image_path', default='data/echonet/images/train/0XC5EED498D232DC9_1.png' ,help='the path of image')
-    parser.add_argument('--anno_path', default='data/echonet/annotations/train/0XC5EED498D232DC9_1.png', help='the path of image annotation')
+    parser.add_argument('--image_path', default='data/echonet/images/train/0XFAE70080273B8AD_103.png' ,help='the path of image')
+    parser.add_argument('--anno_path', default='data/echonet/annotations/train/0XFAE70080273B8AD_103.png', help='the path of image annotation')
     # parser.add_argument('color', help='the color of contour')
     args = parser.parse_args()
 
@@ -34,7 +34,8 @@ def main():
     # draw
     contour = contour.astype(bool)
     visualizer = Visualizer(image=image, vis_backends=[dict(type='LocalVisBackend')], save_dir='temp_dir')
-    visualizer.draw_binary_masks(contour, colors='g')
+    visualizer.draw_binary_masks(contour, colors=[[24,226,24]])
+    # visualizer.draw_binary_masks(contour, colors='g')
     visualizer.add_image(image_path.split('/')[-1].split('.')[0], visualizer.get_image())
 
 
