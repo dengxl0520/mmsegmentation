@@ -5,6 +5,7 @@ import SimpleITK as sitk
 import cv2
 import numpy as np
 import random
+from PIL import Image
 
 SEED = 42
 RESIZE_SIZE = (320,320)
@@ -58,6 +59,62 @@ def filter(x):
     x = np.where(labels == max_area_label, 1, 0).astype(np.uint8)
     return x
 
+# from https://aistudio.baidu.com/projectdetail/1915947
+def resampleSpacing(sitkImage, newspace=(1,1,1)):
+    '''
+        newResample = resampleSpacing(sitkImage, newspace=[1,1,1])
+    '''
+    euler3d = sitk.Euler3DTransform()
+    xsize, ysize, zsize = sitkImage.GetSize()
+    xspacing, yspacing, zspacing = sitkImage.GetSpacing()
+    origin = sitkImage.GetOrigin()
+    direction = sitkImage.GetDirection()
+    #新的X轴的Size = 旧X轴的Size *（原X轴的Spacing / 新设定的Spacing）
+    new_size = (int(xsize*xspacing/newspace[0]),int(ysize*yspacing/newspace[1]),int(zsize*zspacing/newspace[2]))
+    #如果是对标签进行重采样，模式使用最近邻插值，避免增加不必要的像素值
+    sitkImage = sitk.Resample(sitkImage,new_size,euler3d,sitk.sitkNearestNeighbor,origin,newspace,direction)
+    return sitkImage
+
+def resampleSize(sitkImage, depth):
+    '''
+        newsitkImage = resampleSize(sitkImage, depth=DEPTH)
+    '''
+    #重采样函数
+    euler3d = sitk.Euler3DTransform()
+
+    xsize, ysize, zsize = sitkImage.GetSize()
+    xspacing, yspacing, zspacing = sitkImage.GetSpacing()
+    new_spacing_z = zspacing/(depth/float(zsize))
+
+    origin = sitkImage.GetOrigin()
+    direction = sitkImage.GetDirection()
+    #根据新的spacing 计算新的size
+    newsize = (xsize,ysize,int(zsize*zspacing/new_spacing_z))
+    newspace = (xspacing, yspacing, new_spacing_z)
+    sitkImage = sitk.Resample(sitkImage,newsize,euler3d,sitk.sitkNearestNeighbor,origin,newspace,direction)
+    return sitkImage
+
+def resampleXYSize(sitkImage, new_xsize, new_ysize):
+    '''
+        newsitkImage = resampleSize(sitkImage, depth=DEPTH)
+    '''
+    #重采样函数
+    euler3d = sitk.Euler3DTransform()
+
+    xsize, ysize, zsize = sitkImage.GetSize()
+    xspacing, yspacing, zspacing = sitkImage.GetSpacing()
+    new_spacing_x = xspacing/(new_xsize/float(xsize))
+    new_spacing_y = yspacing/(new_ysize/float(ysize))
+
+    origin = sitkImage.GetOrigin()
+    direction = sitkImage.GetDirection()
+    #根据新的spacing 计算新的size
+    newsize = (new_xsize,new_ysize,zsize)
+    newspace = (new_spacing_x, new_spacing_y, zspacing)
+    sitkImage = sitk.Resample(sitkImage,newsize,euler3d,sitk.sitkNearestNeighbor,origin,newspace,direction)
+    return sitkImage
+
+
 def preprocess_data(input_path, output_path, split_file):
     # hyperparam
     resize_size = RESIZE_SIZE
@@ -99,37 +156,51 @@ def preprocess_data(input_path, output_path, split_file):
         # read cfg
         cfg = read_cfg(os.path.join(video_path, 'Info_'+ video_mode +'.cfg'))
 
+        # check ed => es
+        assert cfg['ED'] == cfg['NbFrame'] or cfg["ES"] ==cfg['NbFrame'] 
+        assert float(cfg['LVedv']) > float(cfg['LVesv'])
+    
         # read video
         video = sitk.ReadImage(os.path.join(video_path , video_name + '_sequence.mhd'))
+        video = resampleXYSize(video, *resize_size)
         video_np = sitk.GetArrayFromImage(video)
-        # resize video 
-        resize_video = []
-        for image in video_np:
-            resize_image = cv2.resize(image, resize_size)
-            resize_video.append(resize_image)
         # to rgb
-        resize_video = np.asarray(resize_video)
-        resize_video_rgb = np.repeat(resize_video[np.newaxis, :, :, :], 3, axis=0)
-
+        resize_video_rgb = np.repeat(video_np[np.newaxis, :, :, :], 3, axis=0)
+        if not int(cfg['ED']) -1 < int(cfg['ES']) -1:
+            # print("ED:" + cfg['ED'])
+            # print("ES:" + cfg['ES'])
+            # video reverse
+            resize_video_rgb = np.flip(resize_video_rgb, axis=1)
+            cfg['ED'], cfg['ES'] = cfg['ES'], cfg['ED']
+        # print img
+        # for i in range(len(video_np)):
+        #     cv2.imwrite('./temp/'+str(i)+'.jpg', video_np[i])
+        
         # read annotations
         # assert int(cfg['ED']) < int(cfg['ES'])
         ed = sitk.ReadImage(os.path.join(video_path , video_name + '_ED_gt.mhd'))
-        ed_np = sitk.GetArrayFromImage(ed)
-        resize_ed = cv2.resize(ed_np[0], resize_size)
-        resize_ed[resize_ed != 1] = 0
-        resize_ed = filter(resize_ed)
+        resize_ed = resampleXYSize(ed, *resize_size)
+        ed_np = sitk.GetArrayFromImage(resize_ed)[0]
+        ed_np[ed_np != 1] = 0
+        ed_np = filter(ed_np)
 
         es = sitk.ReadImage(os.path.join(video_path , video_name + '_ES_gt.mhd'))
-        es_np = sitk.GetArrayFromImage(es)
-        resize_es = cv2.resize(es_np[0], resize_size)
-        resize_es[resize_es != 1] = 0
-        resize_es = filter(resize_es)
+        resize_es = resampleXYSize(es, *resize_size)
+        es_np = sitk.GetArrayFromImage(resize_es)[0]
+        es_np[es_np != 1] = 0
+        es_np = filter(es_np)
+
+        # check spacing
+        assert video.GetSpacing() == resize_ed.GetSpacing()
+        assert video.GetSpacing() == resize_es.GetSpacing()
+        x_spacing, y_spacing, z_spacing = video.GetSpacing()
 
         frame_pairs_mask = {
-            str(int(cfg['ED']) -1): resize_ed,
-            str(int(cfg['ES']) -1): resize_es
+            str(int(cfg['ED']) -1): ed_np,
+            str(int(cfg['ES']) -1): es_np
         }
-            
+        # check pixel number
+        assert ed_np.sum() > es_np.sum()
         # save
         if video_name in train_split:
             video_save_path = os.path.join(output_path, 'videos/train')
@@ -148,8 +219,9 @@ def preprocess_data(input_path, output_path, split_file):
             os.path.join(anno_save_path, video_name + '.npz'),
             fnum_mask=frame_pairs_mask,
             ef=float(cfg['LVef']),
-            vol1=float(cfg['LVedv']),
-            vol2=float(cfg['LVesv']),
+            edv=float(cfg['LVedv']),
+            esv=float(cfg['LVesv']),
+            spacing=(x_spacing,y_spacing,z_spacing)
         )
         print(idx+1, video_name)
     

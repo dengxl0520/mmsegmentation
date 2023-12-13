@@ -9,8 +9,6 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from tools.utils_contour import echonet_trace_to_mask
 
-
-
 '''
     The code is modified by EchoGraphs.
     Url: https://github.com/guybenyosef/EchoGraphs
@@ -157,7 +155,6 @@ def preprocess_data(input_path, output_path, save_kpts, save_masks, save_imgs):
             x = np.concatenate((x1[:], np.flip(x2[:])))
             y = np.concatenate((y1[:], np.flip(y2[:])))
             pts = np.array([x, y]).transpose()
-            num_pts = str(len(pts))
 
             if name in x_test:
                 output_list_test.append(str("{0}_{1}.png".format(name, frame)))
@@ -206,25 +203,20 @@ def preprocess_data(input_path, output_path, save_kpts, save_masks, save_imgs):
 
             if len(pts_pairs) == 2:
                 np.save(frames_cycle_folder + "{0}".format(name), video)
-
-                if np.argmin(vol_pairs) == 0:
-                    vol1 = float(esv)
-                    vol2 = float(edv)
-                else:
-                    vol1 = float(edv)
-                    vol2 = float(esv)
-
-                np.savez(anno_cycle_folder+ "{0}".format(name), fnum=frame_pairs,
+                
+                np.savez(anno_cycle_folder+ "{0}".format(name),
+                            fnum=frame_pairs,
                             fnum_mask=frame_pairs_mask,
-                            kpts=np.array(pts_pairs),
-                            ef=ef, vol1=vol1, vol2=vol2)
+                            kpts=np.array(pts_pairs), 
+                            ef=ef, edv=float(edv), esv=float(esv),
+                            spacing=(1.0,1.0,1.0))
 
                 if name in x_test:
-                    output_list_test_cycle.append(str("{0}.png".format(name)))
+                    output_list_test_cycle.append(str("{0}.npy".format(name)))
                 if name in x_train:
-                    output_list_train_cycle.append(str("{0}.png".format(name)))
+                    output_list_train_cycle.append(str("{0}.npy".format(name)))
                 if name in x_val:
-                    output_list_val_cycle.append(str("{0}.png".format(name)))
+                    output_list_val_cycle.append(str("{0}.npy".format(name)))
 
     if not os.path.exists(file_dir):
         os.makedirs(file_dir)

@@ -34,12 +34,12 @@ def load_video_and_mask_file(img_path: str,
     video = np.load(img_path, allow_pickle=True)
     video = video.swapaxes(0, 1)
     kpts_list = np.load(anno_path, allow_pickle=True)
-    ef, vol1, vol2 = kpts_list['ef'], kpts_list['vol1'], kpts_list['vol2']
+    ef, edv, esv = kpts_list['ef'], kpts_list['edv'], kpts_list['esv']
 
     # Collect masks:
     idx_list = []
-    mask_list = kpts_list['fnum_mask'].tolist()
     masks = []
+    mask_list = kpts_list['fnum_mask'].tolist()
     for kpt in kpts_list['fnum_mask'].tolist().keys():
         idx_list.append(int(kpt))
         masks.append(mask_list[kpt])
@@ -48,7 +48,6 @@ def load_video_and_mask_file(img_path: str,
     if idx_list[0] > idx_list[1]:
         idx_list.reverse()
         masks.reverse()
-        vol1, vol2 = vol2, vol1
 
     # compute step:
     x0, x1 = idx_list[1], idx_list[0]
@@ -65,7 +64,9 @@ def load_video_and_mask_file(img_path: str,
     masks = np.asarray(masks)
     imgs = np.asarray(frames)
 
-    return imgs, masks, ef, vol1, vol2
+    spacing = kpts_list['spacing']
+
+    return imgs, masks, ef, edv, esv, spacing
 
 
 @TRANSFORMS.register_module()
@@ -78,8 +79,10 @@ class LoadNpyFile(BaseTransform):
     def transform(self, results: Dict) -> Optional[Dict]:
         img_path = results['img_path']
         anno_path = results['seg_map_path']
-        imgs, masks, ef, esv, edv= load_video_and_mask_file(img_path, anno_path,
-                                                   self.frame_length)
+        imgs, masks, ef, edv, esv, spacing= load_video_and_mask_file(
+            img_path, 
+            anno_path,
+            self.frame_length)
 
         results['img'] = imgs
         results['ori_imgs'] = imgs
