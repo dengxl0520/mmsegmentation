@@ -1,6 +1,7 @@
 # dataset settings
 dataset_type = 'CAMUSVideoDataset'
-data_root = 'data/camus_random42'
+# data_root = 'data/camus_random42'
+data_root = 'data/CAMUS_public_256'
 # pipeline
 train_pipeline = [
     dict(type='LoadNpyFile', frame_length=10, label_idxs=[0,9]),
@@ -48,6 +49,6 @@ test_dataloader = dict(
             img_path='videos/test', seg_map_path='annotations/test'),
         pipeline=test_pipeline))
 val_evaluator = dict(
-    type='EchoMetric', iou_metrics=['mIoU', 'mDice', 'mFscore'], prefix='val')
+    type='IoUMetric', iou_metrics=['mIoU', 'mDice', 'mFscore'], prefix='val')
 test_evaluator = dict(
-    type='EchoMetric', iou_metrics=['mIoU', 'mDice', 'mFscore'], prefix='test')
+    type='IoUMetric', iou_metrics=['mIoU', 'mDice', 'mFscore'], prefix='test')

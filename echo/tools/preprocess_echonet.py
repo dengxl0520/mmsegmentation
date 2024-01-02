@@ -26,7 +26,7 @@ from tools.utils_contour import echonet_trace_to_mask
     - images/filename_framenum.png (112,112,3)
     - annotations/filename_framenum.npz ['kpts']['mask']
     - echocycle/videos/filename.npy(112,112,3,x)
-    - echocycle/annotations/filename.npz ['kpts'](40,2,2) ['mask'](112,112,3,x) ['ef'] ['vol1'] ['vol2']
+    - echocycle/annotations/filename.npz ['kpts'](40,2,2) ['mask'](112,112,3,x) ['ef'] ['edv'] ['esv'] ['spacing']
 
 To save the filenames in the correct folders, set the global CONST variables first
 CONST.US_MultiviewData must point towards the echonet data folder
@@ -71,7 +71,7 @@ def loadvideo(filename: str) -> np.ndarray:
     for count in range(frame_count):
         ret, frame = capture.read()
         if not ret:
-            raise ValueError("Failed to load frame #{} of {}.".format(count, filename))
+            raise ValueError(f"Failed to load frame #{count} of {filename}.")
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         v[count, :, :] = frame
@@ -126,7 +126,7 @@ def preprocess_data(input_path, output_path, save_kpts, save_masks, save_imgs):
         # check whether file exists
         if not os.path.exists(video_path):
             print('Not found: ', video_path)
-            output_list_invalid.append("{0}".format(name))
+            output_list_invalid.append(f"{name}")
             continue
 
         video = loadvideo(video_path).astype(np.uint8)
@@ -144,7 +144,7 @@ def preprocess_data(input_path, output_path, save_kpts, save_masks, save_imgs):
 
             # check whether frame contains a strange number of points
             if ((np.size(gt_pts) / 2) != 42):
-                output_list_invalid.append("{0}".format(name))
+                output_list_invalid.append(f"{name}")
                 break
 
             mask = echonet_trace_to_mask(gt_pts, (112, 112))
@@ -157,21 +157,21 @@ def preprocess_data(input_path, output_path, save_kpts, save_masks, save_imgs):
             pts = np.array([x, y]).transpose()
 
             if name in x_test:
-                output_list_test.append(str("{0}_{1}.png".format(name, frame)))
+                output_list_test.append(f"{name}_{frame}.png")
                 frames_folder = os.path.join(output_path, "images/test/")
                 anno_folder = os.path.join(output_path, "annotations/test/")
                 frames_cycle_folder = os.path.join(output_path, "echocycle/videos/test/")
                 anno_cycle_folder = os.path.join(output_path, "echocycle/annotations/test/")
 
             if name in x_train:
-                output_list_train.append(str("{0}_{1}.png".format(name, frame)))
+                output_list_train.append(f"{name}_{frame}.png")
                 frames_folder = os.path.join(output_path, "images/train/")
                 anno_folder = os.path.join(output_path, "annotations/train/")
                 frames_cycle_folder = os.path.join(output_path, "echocycle/videos/train/")
                 anno_cycle_folder = os.path.join(output_path, "echocycle/annotations/train/")
 
             if name in x_val:
-                output_list_val.append(str("{0}_{1}.png".format(name, frame)))
+                output_list_val.append(f"{name}_{frame}.png")
                 frames_folder = os.path.join(output_path, "images/val/")
                 anno_folder = os.path.join(output_path, "annotations/val/")
                 frames_cycle_folder = os.path.join(output_path, "echocycle/videos/val/")
@@ -194,29 +194,29 @@ def preprocess_data(input_path, output_path, save_kpts, save_masks, save_imgs):
 
             pts_pairs.append(pts)
             if save_imgs:
-                imageio.imsave(frames_folder + "{0}_{1}.png".format(name, frame), frame_img)
+                imageio.imsave(frames_folder + f"{name}_{frame}.png", frame_img)
             if save_masks:
-                imageio.imsave(anno_folder + "{0}_{1}.png".format(name, frame), mask)
+                imageio.imsave(anno_folder + f"{name}_{frame}.png", mask)
             if save_kpts:
-                np.savez(anno_folder + "{0}_{1}".format(name, frame), mask=mask,
+                np.savez(anno_folder + f"{name}_{frame}", mask=mask,
                          kpts=np.asarray(pts), ef=ef)
 
             if len(pts_pairs) == 2:
-                np.save(frames_cycle_folder + "{0}".format(name), video)
+                np.save(frames_cycle_folder + f"{name}", video)
                 
-                np.savez(anno_cycle_folder+ "{0}".format(name),
+                np.savez(anno_cycle_folder+ f"{name}",
                             fnum=frame_pairs,
                             fnum_mask=frame_pairs_mask,
                             kpts=np.array(pts_pairs), 
                             ef=ef, edv=float(edv), esv=float(esv),
                             spacing=(1.0,1.0,1.0))
 
-                if name in x_test:
-                    output_list_test_cycle.append(str("{0}.npy".format(name)))
                 if name in x_train:
-                    output_list_train_cycle.append(str("{0}.npy".format(name)))
+                    output_list_train_cycle.append(f"{name}.npy")
                 if name in x_val:
-                    output_list_val_cycle.append(str("{0}.npy".format(name)))
+                    output_list_val_cycle.append(f"{name}.npy")
+                if name in x_test:
+                    output_list_test_cycle.append(f"{name}.npy")
 
     if not os.path.exists(file_dir):
         os.makedirs(file_dir)

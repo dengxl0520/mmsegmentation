@@ -15,5 +15,6 @@ data_preprocessor = dict(
     size=size)
 model = dict(
     data_preprocessor=data_preprocessor,
-    neck=dict(transformer_enc_layers=6))
+    # neck=dict(transformer_enc_layers=6)
+)
 

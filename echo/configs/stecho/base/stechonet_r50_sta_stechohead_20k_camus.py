@@ -4,7 +4,7 @@ _base_ = [
     '../../_base_/datasets/camus.py',
     '../../_base_/schedules/schedule_20k_cosinelr_sgd_1e-2.py'
 ]
-size=(320,320)
+size=(256,256)
 data_preprocessor = dict(
     type='SegVideoPreProcessor',
     mean=[123.675, 116.28, 103.53],
