@@ -16,7 +16,7 @@ dataset = 'echonet'
 # before_config_path = 'work_dirs/stechonet_r50_sta_stechohead_20k_echonet/stechonet_r50_sta_stechohead_20k_echonet_none.py'
 # before_checkpoint_path = 'work_dirs/stechonet_r50_sta_stechohead_20k_echonet/iter_16000.pth'
 after_config_path = 'work_dirs/stechonet_r50_sta_stechohead_20k_echonet/stechonet_r50_sta_stechohead_20k_echonet.py'
-after_checkpoint_path = 'work_dirs/stechonet_r50_sta_stechohead_20k_echonet/iter_16000.pth'
+after_checkpoint_path = 'work_dirs/stechonet_r50_sta_stechohead_20k_echonet/iter_20000.pth'
 
 videos_folder = 'data/echonet/echocycle/videos/test'
 # all videos
@@ -26,7 +26,7 @@ folder = 'work_dirs/imgs/select'
 videos_list = os.listdir(folder)
 videos_list = [videos_name.split('.')[0] + '.npy' for videos_name in videos_list]
 
-save_dir = 'work_dirs/aplot'
+save_dir = 'work_dirs/temporal'
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
 
@@ -51,13 +51,24 @@ def draw(data, save_path):
     # custom_params = {"axes.spines.right": False, "axes.spines.top": False}
     # sns.set_style("whitegrid", {'grid.alpha': 0.5})
     custom_params = {'grid.alpha': 0.5}
-    sns.set_theme(style='whitegrid',font='Times New Roman', font_scale=3, rc=custom_params)
+    sns.set_theme(style='whitegrid',font='Times New Roman', font_scale=4, rc=custom_params)
     # sns.set_theme(style="whitegrid")
 
     # sns.lineplot(data, linewidth=2, palette=["orange","blue"])
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(11, 6))
 
     sns.lineplot(data, linewidth=2.5)
+
+    # 获取当前的坐标轴
+    ax = plt.gca()
+
+    # 设置坐标轴的宽度
+    ax_line_width = 5
+    ax.spines['bottom'].set_linewidth(ax_line_width)  # 设置x轴的宽度
+    ax.spines['left'].set_linewidth(ax_line_width)    # 设置y轴的宽度
+    ax.spines['top'].set_linewidth(ax_line_width)
+    ax.spines['right'].set_linewidth(ax_line_width)
+
     plt.legend().set_visible(False)
 
     plt.savefig(save_path)

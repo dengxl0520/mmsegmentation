@@ -23,8 +23,97 @@ from mmdet.models.dense_heads.anchor_free_head import AnchorFreeHead
 from .mask2former_head import Mask2FormerHead
 from ..builder import build_loss
 
+import logging
+import fvcore.nn.weight_init as weight_init
+from typing import Optional
+import torch
+from torch import nn, Tensor
+from torch.nn import functional as F
+
+from mmcv.cnn import build_norm_layer
+from mmcv.cnn.bricks.transformer import FFN, MultiheadAttention
+from mmengine.model import ModuleList
+from mmengine.visualization import Visualizer
+from mmdet.models.layers.transformer.detr_layers import DetrTransformerDecoder, DetrTransformerDecoderLayer
+
+class BoundaryTransformerDecoder(DetrTransformerDecoder):
+    """Decoder of Mask2Former."""
+
+    def _init_layers(self) -> None:
+        """Initialize decoder layers."""
+        self.layers = ModuleList([
+            BoundaryAttentionLayer(**self.layer_cfg)
+            for _ in range(self.num_layers)
+        ])
+        self.embed_dims = self.layers[0].embed_dims
+        self.post_norm = build_norm_layer(self.post_norm_cfg,
+                                          self.embed_dims)[1]
+
+class BoundaryAttentionLayer(DetrTransformerDecoderLayer):
+    def _init_layers(self) -> None:
+        """Initialize self-attention, FFN, and normalization."""
+        self.self_attn = MultiheadAttention(**self.self_attn_cfg)
+        self.boundary_attn = MultiheadAttention(**self.cross_attn_cfg)
+        self.cross_attn = MultiheadAttention(**self.cross_attn_cfg)
+        self.embed_dims = self.self_attn.embed_dims
+        self.ffn = FFN(**self.ffn_cfg)
+        norms_list = [
+            build_norm_layer(self.norm_cfg, self.embed_dims)[1]
+            for _ in range(3)
+        ]
+        self.norms = ModuleList(norms_list)
+
+
+    def forward(self, 
+                query: Tensor, 
+                key: Tensor = None, 
+                value: Tensor = None, 
+                query_pos: Tensor = None, 
+                key_pos: Tensor = None, 
+                self_attn_mask: Tensor = None, 
+                corss_attn_mask: Tensor = None,
+                boundary_attn_mask: Tensor = None,
+                key_padding_mask: Tensor = None, 
+                **kwargs) -> Tensor:
+        
+        tgt_boundary = self.boundary_attn(
+            query=query,
+            key=key,
+            value=value,
+            query_pos=query_pos,
+            key_pos=key_pos,
+            attn_mask=boundary_attn_mask,
+            key_padding_mask=key_padding_mask,
+            **kwargs)
+        # tgt_cross_attn = self.cross_attn(
+        #     query=query,
+        #     key=key,
+        #     value=value,
+        #     query_pos=query_pos,
+        #     key_pos=key_pos,
+        #     attn_mask=corss_attn_mask,
+        #     key_padding_mask=key_padding_mask,
+        #     **kwargs)
+        # query = self.norms[0](tgt_boundary + tgt_cross_attn)
+        query = self.norms[0](tgt_boundary)
+        query = self.self_attn(
+            query=query,
+            key=query,
+            value=query,
+            query_pos=query_pos,
+            key_pos=query_pos,
+            attn_mask=self_attn_mask,
+            **kwargs)
+        query = self.norms[1](query)
+        query = self.ffn(query)
+        query = self.norms[2](query)
+
+        return query
+
+
+
 @MODELS.register_module()
-class STEchoHead(nn.Module):
+class STEchoHeadv3(nn.Module):
     def __init__(self,
                  in_channels: List[int],
                  feat_channels: int,
@@ -61,7 +150,7 @@ class STEchoHead(nn.Module):
             feat_channels=feat_channels,
             out_channels=out_channels)
         self.pixel_decoder = MODELS.build(pixel_decoder_)
-        self.transformer_decoder = Mask2FormerTransformerDecoder(
+        self.transformer_decoder = BoundaryTransformerDecoder(
             **transformer_decoder)
         self.decoder_embed_dims = self.transformer_decoder.embed_dims
 
@@ -169,6 +258,7 @@ class STEchoHead(nn.Module):
         ]
 
         all_mask_preds = self(x, batch_data_samples)
+
         mask_pred_results = all_mask_preds[-1]
         if 'pad_shape' in batch_img_metas[0]:
             size = batch_img_metas[0]['pad_shape']
@@ -199,11 +289,15 @@ class STEchoHead(nn.Module):
         #   (batch_size * num_head, num_queries, h, w)
         attn_mask = attn_mask.flatten(2).unsqueeze(1).repeat(
             (1, self.num_heads, 1, 1)).flatten(0, 1)
-        attn_mask = attn_mask.sigmoid() < 0.5
-        attn_mask = attn_mask.detach()
+        cross_attn_mask = attn_mask.sigmoid() < 0.5
+        in_attn_mask = attn_mask.sigmoid() < 0.4 
+        out_attn_mask = attn_mask.sigmoid() > 0.6 
+        boundary_attn_mask = in_attn_mask | out_attn_mask
+        cross_attn_mask = cross_attn_mask.detach()
+        boundary_attn_mask = boundary_attn_mask.detach()
 
-        return mask_pred, attn_mask
-  
+        return mask_pred, cross_attn_mask, boundary_attn_mask
+
     def forward(self, x: List[Tensor],
                 batch_data_samples: SampleList) -> Tuple[List[Tensor]]:
         batch_img_metas = [
@@ -212,6 +306,7 @@ class STEchoHead(nn.Module):
         # batch_size = len(batch_img_metas)
         batch_size = x[0].shape[0]
         mask_features, multi_scale_memorys = self.pixel_decoder(x)
+
         # multi_scale_memorys (from low resolution to high resolution)
         decoder_inputs = []
         decoder_positional_encodings = []
@@ -238,15 +333,17 @@ class STEchoHead(nn.Module):
             (batch_size, 1, 1))
 
         mask_pred_list = []
-        mask_pred, attn_mask = self._forward_head(
+        mask_pred, cross_attn_mask, boundary_attn_mask = self._forward_head(
             query_feat, mask_features, multi_scale_memorys[0].shape[-2:])
         mask_pred_list.append(mask_pred)
 
         for i in range(self.num_transformer_decoder_layers):
             level_idx = i % self.num_transformer_feat_level
             # if a mask is all True(all background), then set it all False.
-            attn_mask[torch.where(
-                attn_mask.sum(-1) == attn_mask.shape[-1])] = False
+            cross_attn_mask[torch.where(
+                cross_attn_mask.sum(-1) == cross_attn_mask.shape[-1])] = False
+            boundary_attn_mask[torch.where(
+                boundary_attn_mask.sum(-1) == boundary_attn_mask.shape[-1])] = False
 
             # cross_attn + self_attn
             layer = self.transformer_decoder.layers[i]
@@ -256,11 +353,12 @@ class STEchoHead(nn.Module):
                 value=decoder_inputs[level_idx],
                 query_pos=query_embed,
                 key_pos=decoder_positional_encodings[level_idx],
-                cross_attn_mask=attn_mask,
+                corss_attn_mask=cross_attn_mask,
+                boundary_attn_mask=boundary_attn_mask,
                 query_key_padding_mask=None,
                 # here we do not apply masking on padded region
                 key_padding_mask=None)
-            mask_pred, attn_mask = self._forward_head(
+            mask_pred, cross_attn_mask, boundary_attn_mask = self._forward_head(
                 query_feat, mask_features, multi_scale_memorys[
                     (i + 1) % self.num_transformer_feat_level].shape[-2:])
 
@@ -268,54 +366,4 @@ class STEchoHead(nn.Module):
 
         return mask_pred_list
 
-
-@MODELS.register_module()
-class STEchoHeadwithBloss(STEchoHead):
-    def loss(self, x: Tuple[Tensor], batch_data_samples: SampleList,
-             train_cfg: ConfigType) -> dict:
-        seg_label = self._stack_batch_gt(batch_data_samples).squeeze()
-
-        all_mask_preds = self(x, batch_data_samples)
-
-        if 'pad_shape' in batch_data_samples[0]:
-            size = batch_data_samples[0].get('pad_shape')
-        else:
-            size = batch_data_samples[0].get('img_shape')
-
-        # losses
-        losses_decode = self.loss_decode
-        losses_ce, losses_dice, losses_boundary = [], [], []
-        for mask in all_mask_preds:
-            seg_logits = F.interpolate(mask, size=size, mode='bilinear', align_corners=False)
-            seg_logits = seg_logits.sigmoid()
-            loss_ce = losses_decode[0](
-                    seg_logits,
-                    seg_label,
-                    ignore_index=self.ignore_index)
-            loss_dice = losses_decode[1](
-                    seg_logits,
-                    seg_label,
-                    ignore_index=self.ignore_index)
-            loss_boundary = losses_decode[2](
-                seg_logits,
-                seg_label
-            )
-            
-            losses_ce.append(loss_ce)
-            losses_dice.append(loss_dice)
-            losses_boundary.append(loss_boundary)
-
-        loss_dict = dict()
-        loss_dict['loss_ce'] = losses_ce[-1]
-        loss_dict['loss_dice'] = losses_dice[-1]
-        loss_dict['loss_boundary'] = losses_boundary[-1]
-
-        num_dec_layer = 0
-        for loss_mask_i, loss_dice_i, loss_boundary_i in zip(losses_ce[:-1], losses_dice[:-1], losses_boundary[:-1]):
-            loss_dict[f'd{num_dec_layer}.loss_ce'] = loss_mask_i
-            loss_dict[f'd{num_dec_layer}.loss_dice'] = loss_dice_i
-            loss_dict[f'd{num_dec_layer}.loss_boundary'] = loss_boundary_i
-            num_dec_layer += 1
-
-        return loss_dict
 

@@ -226,7 +226,6 @@ class MSDeformAttnTransformerEncoderOnly(nn.Module):
 
         return memory, spatial_shapes, level_start_index
 
-
 class MSDeformAttnTransformerEncoderLayer(nn.Module):
     def __init__(self,
                  d_model=256, d_ffn=1024,
@@ -303,9 +302,29 @@ class MSDeformAttnTransformerEncoder(nn.Module):
         reference_points = self.get_reference_points(spatial_shapes, valid_ratios, device=src.device)
 
         for _, (layer_spatial, layer_temporal) in enumerate(zip(self.spatial_layers, self.temporal_layers)):
+            ''' t(s(x)) + x
             output = layer_spatial(output, pos, reference_points, spatial_shapes, level_start_index, padding_mask)
             output = layer_temporal(src=output, pos=pos_3d, patch_mask_indices=patch_mask_indices) + output_new
             output_new = output
+            '''
+
+            ''' t(s(x) + x) + x
+            output = layer_spatial(output, pos, reference_points, spatial_shapes, level_start_index, padding_mask) + output_new
+            output = layer_temporal(src=output, pos=pos_3d, patch_mask_indices=patch_mask_indices) + output_new
+            output_new = output
+            '''
+            
+            ''' s(t(x) + x) + x
+            output = layer_temporal(src=output, pos=pos_3d, patch_mask_indices=patch_mask_indices) + output_new
+            output = layer_spatial(output, pos, reference_points, spatial_shapes, level_start_index, padding_mask) + output_new
+            output_new = output
+            '''
+            
+            # ''' s(t(x)) + x
+            output = layer_temporal(src=output, pos=pos_3d, patch_mask_indices=patch_mask_indices)
+            output = layer_spatial(output, pos, reference_points, spatial_shapes, level_start_index, padding_mask) + output_new
+            output_new = output
+            # '''
             
             # print(f"Sanity test: {torch.all(output == output_1)}")
 

@@ -9,8 +9,8 @@ from echo.tools.utils_contour import find_contours
 def parse_args():
     parser = argparse.ArgumentParser(
         description='draw contour in image')
-    parser.add_argument('--image_path', default='data/echonet/images/train/0XFAE70080273B8AD_103.png' ,help='the path of image')
-    parser.add_argument('--anno_path', default='data/echonet/annotations/train/0XFAE70080273B8AD_103.png', help='the path of image annotation')
+    parser.add_argument('--image_path', default='data/echonet/images/train/0X406C79DF5EBE13D9_44.png' ,help='the path of image')
+    parser.add_argument('--anno_path', default='data/echonet/annotations/train/0X406C79DF5EBE13D9_44.png', help='the path of image annotation')
     # parser.add_argument('color', help='the color of contour')
     args = parser.parse_args()
 

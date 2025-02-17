@@ -2,6 +2,7 @@ import os
 import cv2 
 import csv
 import json
+import torch
 import shutil
 import numpy as np
 import pandas as pd
@@ -141,19 +142,24 @@ def get_info(img_arr, save_path):
     end_p = [int(x) for x in div_l2[1]]
     cv2.line(img_result, start_p, end_p,color=(0,0,255))
 
-    cv2.imwrite(save_path, img_result)
+    # cv2.imwrite(save_path, img_result)
     # plt.imshow(img_result)
     # plt.show()
 
     return out_trg, in_trg, contours, L_p, [div_l1, div_l2]
 
 
-def get_volume(img_arr, save_path):
+def get_volume(img_arr, save_path = None, spacing = [1.0, 1.0]):
     info = get_info(img_arr, save_path)
     div_line1, div_line2 = info[-1]
     L = info[-2][0] - info[-2][1]
     dis1 = div_line1[0] - div_line1[1]
     dis2 = div_line2[0] - div_line2[1]
+
+    # spacing
+    if isinstance(spacing, torch.Tensor):
+        spacing = spacing.cpu().data.numpy()
+    L, dis1, dis2 = L * spacing, dis1 * spacing, dis2 * spacing
 
     # Trisecting surface radius
     dis1 = np.linalg.norm(dis1,axis=-1,keepdims=False) / 2.0

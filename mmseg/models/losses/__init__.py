@@ -1,6 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from .accuracy import Accuracy, accuracy
 from .boundary_loss import BoundaryLoss
+from .boundary_lossv2 import BoundaryLossV2
 from .cross_entropy_loss import (CrossEntropyLoss, binary_cross_entropy,
                                  cross_entropy, mask_cross_entropy)
 from .dice_loss import DiceLoss, BinaryDiceLoss

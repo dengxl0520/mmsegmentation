@@ -221,8 +221,11 @@ def main():
 
             outputs = model.predict(inputs=data['inputs'], data_samples=data['data_samples'])
             # outputs = model.postprocess_result(seg_logits, data['data_samples'])
-
+            print(outputs[0].metainfo['img_path'])
             for data_sample in outputs:
+                print(data_sample.pred_sem_seg.data.sum())
+                continue
+
                 idx = '_' + str(data_sample.get('frame_idx')) + '_'
                 img_name = outputs[0].get('img_path').split('/')[-1].split(
                     '.')[0] +idx+  ".png"

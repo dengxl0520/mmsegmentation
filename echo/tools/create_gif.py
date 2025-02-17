@@ -94,12 +94,8 @@ def main():
     # load config
     cfg = Config.fromfile(args.config)
     cfg.load_from = args.checkpoint
-    pipeline=[
-        dict(type='LoadNpyFile', frame_length=10, label_idxs=[0, 9]),
-        dict(type='VideoGenerateEdge', edge_width=4),
-        dict(type='TestPackSegMultiInputs')
-    ]
-    cfg.test_dataloader.dataset.pipeline = pipeline
+    test_pipeline = cfg.test_dataloader.dataset.pipeline 
+    test_pipeline[-1] = dict(type='TestPackSegMultiInputs') # 会污染原来的配置文件,需要手动改回PackSegMultiInputs
 
     # build the runner from config
     runner = Runner.from_cfg(cfg)
@@ -121,11 +117,11 @@ def main():
 
     for idx, data_batch in enumerate(runner.test_loop.dataloader):
         model = runner.model 
-        data_preprocessor = runner.model.data_preprocessor
+        data_preprocessor = model.data_preprocessor
 
         data = data_preprocessor(data_batch)
-        seg_logits = model._semi_forward(**data)
-        outputs = model.postprocess_result(seg_logits, data['data_samples'])
+        model.set_train_cfg(data['data_samples'], batchsize=1)
+        outputs = model.predict(**data)
 
         drawn_imgs = []
         imgs_name = outputs[0].get('img_path').split('/')[-1].split(

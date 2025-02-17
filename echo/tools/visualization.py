@@ -92,11 +92,8 @@ def main():
     # load config
     cfg = Config.fromfile(args.config)
     cfg.load_from = args.checkpoint
-    pipeline=[
-        dict(type='LoadNpyFile', frame_length=10, label_idxs=[0, 9]),
-        dict(type='TestPackSegMultiInputs')
-    ]
-    cfg.test_dataloader.dataset.pipeline = pipeline
+    test_pipeline = cfg.test_dataloader.dataset.pipeline 
+    test_pipeline[-1] = dict(type='TestPackSegMultiInputs') # 会污染原来的配置文件,需要手动改回PackSegMultiInputs
 
     # build the runner from config
     runner = Runner.from_cfg(cfg)
@@ -122,15 +119,8 @@ def main():
             data_preprocessor = runner.model.data_preprocessor
 
             data = data_preprocessor(data_batch)
-            # seg_logits = model._semi_forward(**data)
-            if runner.model.with_neck:
-                runner.model.neck.frame_length = len(data['inputs'])
-                runner.model.neck.batchsize = 1
-            if runner.model.with_decode_head:
-                runner.model.decode_head.frame_length = len(data['inputs'])
-                runner.model.decode_head.batchsize = 1
-
-            outputs = model.predict(inputs=data['inputs'], data_samples=data['data_samples'])
+            model.set_train_cfg(data['data_samples'], batchsize=1)
+            outputs = model.predict(**data)
             # outputs = model.postprocess_result(seg_logits, data['data_samples'])
 
             ori_imgs, sum_imgs= [], []

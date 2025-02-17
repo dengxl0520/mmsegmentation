@@ -16,6 +16,9 @@ from mmengine.logging import MMLogger, print_log
 from .iou_metric import IoUMetric
 from scipy.spatial.distance import cdist
 from echo.tools.utils_contour import find_contour_points
+from echo.tools.ef_simpson_ljy import get_volume
+from echo.tools.compute_ef import compute_left_ventricle_volumes_single_plane
+from medpy.metric.binary import hd95 as medpy_hd95
 
 def draw_linear_regression_map(data, xname:str, yname:str, fig_name:str):
     import seaborn as sns
@@ -65,9 +68,10 @@ def bias(x, y):
     '''
         x : gt
         y : pred
-        bias = sum( y_real - y_predict ) / len( y_real )
+        bias = sum( abs(y_real - y_predict) ) / len( y_real )
     '''
-    return (x - y).mean()
+    # return ((x - y)).mean()
+    return (abs(x - y)).mean()
 
 def std(x):
     '''
@@ -82,7 +86,29 @@ def simpson(label, pred_label, gt_vol):
     pred_vol = pred_label.sum() * gt_vol / label.sum()
     return pred_vol
 
+def simpson_rule(pred_label, spacing = None):
+    if isinstance(pred_label, torch.Tensor):
+        pred_label = pred_label.cpu().data.numpy().astype(np.uint8)
+    elif isinstance(pred_label, np.ndarray):
+        pred_label = pred_label.astype(np.uint8)
+
+    if spacing is not None:
+        pred_vol = get_volume(pred_label, spacing=spacing)
+    else:
+        pred_vol = get_volume(pred_label)
+    return torch.tensor(pred_vol)
+
+def simpson_single_plane(pred_label, spacing = None):
+    if isinstance(pred_label, torch.Tensor):
+        pred_label = pred_label.cpu().data.numpy().astype(np.uint8)
+    elif isinstance(pred_label, np.ndarray):
+        pred_label = pred_label.astype(np.uint8)
+
+
 def LVEF(vol_pred):
+    '''
+        pixel to volume
+    '''
     vol1, vol2 = vol_pred
     a = abs(vol1 - vol2)
     b = max(vol1, vol2)
@@ -116,6 +142,8 @@ class EchoMetric(IoUMetric):
             self.lvef_gt = torch.stack(self.lvef_gt).numpy()
         if isinstance(self.lvef_pred[0], Tensor):
             self.lvef_pred = torch.stack(self.lvef_pred).numpy()
+        if isinstance(self.lvef_pred, List):
+            self.lvef_pred = np.array(self.lvef_pred)
         self.corr = corr(self.lvef_gt, self.lvef_pred)
         self.bias = bias(self.lvef_gt, self.lvef_pred)
         self.std = std(self.lvef_pred-self.lvef_gt)
@@ -145,11 +173,30 @@ class EchoMetric(IoUMetric):
                 label = data_sample['gt_sem_seg']['data'].squeeze().to(
                     pred_label)
                 # compute hd95
-                hd95 = hausdorff_distance(pred_label, label, 95)
-                self.hd95.append(hd95)
+                # hd95 = hausdorff_distance(pred_label, label, 95)
+                # self.hd95.append(hd95)
+                # compute by medpy_hd95
+                med_hd95 = medpy_hd95(
+                    pred_label.cpu().data.numpy(),
+                    label.cpu().data.numpy(),
+                    voxelspacing=data_sample["spacing"][:-1],
+                )
+                self.hd95.append(med_hd95)
                 
                 # compute vol_pred
-                vol_pred.append(simpson(label,pred_label,vol_gt[idx]))
+                # vol_pred.append(simpson(label,pred_label,vol_gt[idx]))
+                vol_pred.append(
+                    simpson_rule(
+                        label,
+                        spacing=data_sample["spacing"][:-1]
+                    )
+                )
+                # vol_pred.append(
+                #     compute_left_ventricle_volumes_single_plane(
+                #         pred_label.cpu().data.numpy(),
+                #         voxelspacing=data_sample["spacing"].cpu().data.numpy()[:-1]
+                #     )
+                # )
 
                 self.results.append(
                     self.intersect_and_union(pred_label, label, num_classes,
@@ -171,4 +218,4 @@ class EchoMetric(IoUMetric):
 
         # lvef
         self.lvef_gt.append(data_samples[0]['ef'])
-        self.lvef_pred.append(LVEF(vol_pred).cpu())
+        self.lvef_pred.append(LVEF(vol_pred))

@@ -45,12 +45,12 @@ def load_video_and_mask_file(img_path: str,
         masks.append(mask_list[kpt])
 
     # Swap if ED before ES:
-    if idx_list[0] > idx_list[1]:
+    if idx_list[0] > idx_list[-1]:
         idx_list.reverse()
         masks.reverse()
 
     # compute step:
-    x0, x1 = idx_list[1], idx_list[0]
+    x0, x1 = idx_list[-1], idx_list[0]
     step = min(x0, (x0 - x1) / (frame_length - 1))
 
     # select frames inds:
@@ -61,7 +61,14 @@ def load_video_and_mask_file(img_path: str,
     for i in range(frame_length):
         frames.append(video[frame_inds[i]])
 
+    if len(masks) > frame_length:
+        labels = []
+        for i in range(frame_length):
+            labels.append(masks[frame_inds[i]])
+        masks = labels
+
     masks = np.asarray(masks)
+    masks[masks != 1] = 0
     imgs = np.asarray(frames)
 
     spacing = kpts_list['spacing']
@@ -86,6 +93,8 @@ class LoadNpyFile(BaseTransform):
 
         results['img'] = imgs
         results['ori_imgs'] = imgs
+        if len(self.label_idxs) < len(masks):
+            masks = masks[self.label_idxs]
         results['masks'] = masks
         results['frame_length'] = self.frame_length
         results['label_idxs'] = self.label_idxs
@@ -95,6 +104,7 @@ class LoadNpyFile(BaseTransform):
         results['ori_shape'] = imgs.shape[2:]
         results['esv'] = esv
         results['edv'] = edv
+        results['spacing'] = spacing
 
         return results
 
@@ -144,6 +154,9 @@ class PackSegMultiInputs(BaseTransform):
             img_meta['ef'] = to_tensor(results['ef'].astype(np.float32))
             img_meta['esv'] = to_tensor(results['esv'].astype(np.float32))
             img_meta['edv'] = to_tensor(results['edv'].astype(np.float32))
+
+        if 'spacing' in results:
+            img_meta['spacing'] = to_tensor(results['spacing'].astype(np.float32))
 
         if 'label_idxs' in img_meta:
             for i in range(len(img_meta['label_idxs'])):

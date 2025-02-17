@@ -12,7 +12,9 @@ from .tbgm import TemporalBoundaryGuidedMoudle
 from .temporal_neck_module import TemporalNeck
 from .temporal_attention_module import TemporalNeckSimple
 from .st_attention import STAttention
+from .neighborhood_correlation_mining import NeighborhoodCorrelationMining
 
 __all__ = [
-    'FPN', 'MultiLevelNeck', 'MLANeck', 'ICNeck', 'JPU', 'Feature2Pyramid'
+    'FPN', 'MultiLevelNeck', 'MLANeck', 'ICNeck', 'JPU', 'Feature2Pyramid', 
+    'NeighborhoodCorrelationMining',
 ]
